@@ -20,29 +20,30 @@ class PlanRequest(BaseModel):
 
 @router.post("/generate")
 async def generate_plan(req: PlanRequest, session: Session = Depends(get_session)):
-    system = """You are a TOEFL expert coach. Generate a personalized weekly study plan as JSON.
-Output format:
+    system = """你是一位资深 TOEFL 备考教练。请用中文生成个性化的周计划 JSON。
+输出格式：
 {
   "weeks": [
     {
       "week": 1,
-      "focus": "Reading & Vocabulary",
+      "focus": "阅读与词汇",
       "daily_tasks": [
-        {"day": "Monday", "tasks": ["Read 1 TPO passage", "Learn 20 vocab words"]},
+        {"day": "周一", "tasks": ["精读 1 篇 TPO 阅读", "背诵 20 个核心词汇"]},
         ...
       ],
-      "weekly_goal": "Complete 3 reading passages"
+      "weekly_goal": "完成 3 篇阅读并整理错题"
     }
   ],
   "total_weeks": 8,
-  "study_tips": ["tip1", "tip2"]
-}"""
-    user = f"""Create a TOEFL study plan for:
-- Current level: {req.current_level}
-- Target score: {req.target_score}/120
-- Exam date: {req.exam_date}
-- Available hours per week: {req.weekly_hours}
-Generate a realistic week-by-week plan."""
+  "study_tips": ["每天坚持背单词", "做完题后复盘错因"]
+}
+注意：所有内容必须用中文，day 用"周一"到"周日"。"""
+    user = f"""请为以下学员定制 TOEFL 备考计划：
+- 当前水平：{req.current_level}
+- 目标分数：{req.target_score}/120
+- 考试日期：{req.exam_date}
+- 每周可用学习时间：{req.weekly_hours} 小时
+请生成切实可行的逐周计划，包含每日具体任务。"""
 
     plan_data = await chat_json(system, user, temperature=0.7)
 

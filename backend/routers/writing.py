@@ -24,23 +24,24 @@ class SubmitRequest(BaseModel):
 
 @router.post("/submit")
 async def submit_writing(req: SubmitRequest, session: Session = Depends(get_session)):
-    system = """You are a TOEFL writing examiner. Evaluate the essay and return JSON:
+    system = """你是一位专业的 TOEFL 写作考官。请用中文评价考生的作文，并返回 JSON：
 {
   "task_achievement_score": <0-30>,
   "coherence_score": <0-30>,
   "language_score": <0-30>,
   "feedback": {
-    "band_descriptor": "Good / Fair / Limited / Weak",
-    "strengths": ["strength1", "strength2"],
-    "suggestions": ["suggestion1", "suggestion2"],
-    "corrected_excerpt": "A corrected version of one weak sentence"
+    "band_descriptor": "优秀 / 良好 / 一般 / 较弱",
+    "strengths": ["优点1", "优点2"],
+    "suggestions": ["改进建议1", "改进建议2"],
+    "corrected_excerpt": "对文中一个薄弱句子的修改示范（用英文写修改后的句子）"
   }
-}"""
-    user = f"""Task type: {req.task_type}
-Prompt: {req.prompt}
-Essay:
+}
+注意：除 corrected_excerpt 可用英文外，其余 feedback 内容必须用中文。"""
+    user = f"""题目类型：{req.task_type}
+题目：{req.prompt}
+考生作文：
 {req.essay_text}
-Evaluate this TOEFL writing response."""
+请评价这篇 TOEFL 写作。"""
 
     result = await chat_json(system, user, temperature=0.3)
 

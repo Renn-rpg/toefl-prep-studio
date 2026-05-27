@@ -33,19 +33,19 @@ export function Evaluation() {
   return (
     <div className="max-w-3xl space-y-8 animate-fade-up">
       <div>
-        <h1 className="font-display text-3xl font-bold text-slate-800">阶段评估</h1>
-        <p className="text-slate-500 mt-1 text-sm">记录周测 / 月测成绩，追踪进步轨迹</p>
+        <h1 className="font-display text-3xl font-bold text-stone-800">阶段评估</h1>
+        <p className="text-stone-500 mt-1 text-sm">记录周测 / 月测成绩，追踪进步轨迹</p>
       </div>
 
       {/* Log form */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-        <h2 className="font-display text-lg font-semibold text-slate-800 mb-5 flex items-center gap-2">
-          <Plus className="h-5 w-5 text-blue-500" /> 录入成绩
+      <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm">
+        <h2 className="font-display text-lg font-semibold text-stone-800 mb-5 flex items-center gap-2">
+          <Plus className="h-5 w-5 text-teal-500" /> 录入成绩
         </h2>
         <form onSubmit={save} className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">评估类型</label>
-            <select className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            <label className="block text-xs font-medium text-stone-500 mb-1.5">评估类型</label>
+            <select className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-sm bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
               value={form.stage_type} onChange={e => setForm({ ...form, stage_type: e.target.value })}>
               <option value="weekly">周测</option>
               <option value="monthly">月测</option>
@@ -53,30 +53,30 @@ export function Evaluation() {
           </div>
           {form.stage_type === 'weekly' && (
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">第几周</label>
-              <input type="number" min={1} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              <label className="block text-xs font-medium text-stone-500 mb-1.5">第几周</label>
+              <input type="number" min={1} className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-sm bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
                 value={form.week_number} onChange={e => setForm({ ...form, week_number: Number(e.target.value) })} />
             </div>
           )}
           {(['listening', 'reading', 'speaking', 'writing'] as const).map(s => (
             <div key={s}>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5 capitalize">
+              <label className="block text-xs font-medium text-stone-500 mb-1.5 capitalize">
                 {s === 'listening' ? '听力' : s === 'reading' ? '阅读' : s === 'speaking' ? '口语' : '写作'} (0-30)
               </label>
               <input type="number" min={0} max={30}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-sm bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
                 value={form[`${s}_score`]}
                 onChange={e => setForm({ ...form, [`${s}_score`]: Number(e.target.value) })} />
             </div>
           ))}
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">备注</label>
-            <input type="text" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            <label className="block text-xs font-medium text-stone-500 mb-1.5">备注</label>
+            <input type="text" className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-sm bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
               value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="本次测试的感受..." />
           </div>
           <div className="col-span-2">
             <button type="submit" disabled={saving}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-medium disabled:opacity-50 transition-colors">
+              className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-5 py-2.5 text-sm font-medium disabled:opacity-50 transition-colors">
               {saving ? '保存中...' : '保存成绩'}
             </button>
           </div>
@@ -85,15 +85,15 @@ export function Evaluation() {
 
       {/* Trend chart */}
       {trendData.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-          <h2 className="font-display text-lg font-semibold text-slate-800 mb-4">成绩趋势</h2>
+        <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm">
+          <h2 className="font-display text-lg font-semibold text-stone-800 mb-4">成绩趋势</h2>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={trendData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} />
               <YAxis domain={[0, 120]} tick={{ fontSize: 12, fill: '#94a3b8' }} />
               <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-              <Line type="monotone" dataKey="总分" stroke="#3B82F6" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="总分" stroke="#0F766E" strokeWidth={2} dot={{ r: 4 }} />
               <Line type="monotone" dataKey="听力" stroke="#10B981" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
               <Line type="monotone" dataKey="阅读" stroke="#F59E0B" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
               <Line type="monotone" dataKey="口语" stroke="#8B5CF6" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
@@ -106,28 +106,28 @@ export function Evaluation() {
       {/* History */}
       <div className="space-y-3">
         {history.map(e => (
-          <div key={e.id} className="bg-white rounded-xl border border-slate-200 p-4">
+          <div key={e.id} className="bg-white rounded-xl border border-stone-200 p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="font-semibold text-slate-800 text-sm">
+              <span className="font-semibold text-stone-800 text-sm">
                 {e.stage_type === 'weekly' ? `第 ${e.week_number} 周测试` : '月度测试'}
               </span>
-              <span className="text-xs text-slate-400">{e.created_at.split('T')[0]}</span>
+              <span className="text-xs text-stone-400">{e.created_at.split('T')[0]}</span>
             </div>
             <div className="flex items-center gap-6">
               {(['listening', 'reading', 'speaking', 'writing'] as const).map(s => (
                 <div key={s} className="text-center">
-                  <div className="font-mono font-bold text-lg text-slate-800">
+                  <div className="font-mono font-bold text-lg text-stone-800">
                     {e[`${s}_score` as keyof StageEval]}
                   </div>
-                  <div className="text-[10px] text-slate-400">{s === 'listening' ? '听' : s === 'reading' ? '读' : s === 'speaking' ? '说' : '写'}</div>
+                  <div className="text-[10px] text-stone-400">{s === 'listening' ? '听' : s === 'reading' ? '读' : s === 'speaking' ? '说' : '写'}</div>
                 </div>
               ))}
               <div className="ml-auto text-center">
-                <div className="font-mono font-bold text-2xl text-blue-600">{e.total_score}</div>
-                <div className="text-[10px] text-slate-400">总分</div>
+                <div className="font-mono font-bold text-2xl text-teal-600">{e.total_score}</div>
+                <div className="text-[10px] text-stone-400">总分</div>
               </div>
             </div>
-            {e.notes && <p className="mt-2 text-xs text-slate-400 italic">"{e.notes}"</p>}
+            {e.notes && <p className="mt-2 text-xs text-stone-400 italic">"{e.notes}"</p>}
           </div>
         ))}
       </div>

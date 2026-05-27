@@ -6,31 +6,31 @@ import { Sparkles, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 function WeekCard({ week }: { week: PlanWeek }) {
   const [open, setOpen] = useState(week.week === 1)
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-stone-50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-mono font-bold">
+          <div className="w-8 h-8 bg-teal-600 text-white rounded-full flex items-center justify-center text-sm font-mono font-bold">
             {week.week}
           </div>
           <div className="text-left">
-            <div className="font-semibold text-slate-800">{week.focus}</div>
-            <div className="text-xs text-slate-400">{week.weekly_goal}</div>
+            <div className="font-semibold text-stone-800">{week.focus}</div>
+            <div className="text-xs text-stone-400">{week.weekly_goal}</div>
           </div>
         </div>
-        {open ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+        {open ? <ChevronUp className="h-4 w-4 text-stone-400" /> : <ChevronDown className="h-4 w-4 text-stone-400" />}
       </button>
       {open && (
-        <div className="border-t border-slate-100 px-5 py-4 grid grid-cols-2 gap-3">
+        <div className="border-t border-stone-100 px-5 py-4 grid grid-cols-2 gap-3">
           {week.daily_tasks.map((dt) => (
-            <div key={dt.day} className="bg-slate-50 rounded-lg p-3">
-              <div className="text-xs font-semibold text-blue-600 mb-1.5">{dt.day}</div>
+            <div key={dt.day} className="bg-stone-50 rounded-lg p-3">
+              <div className="text-xs font-semibold text-teal-600 mb-1.5">{dt.day}</div>
               <ul className="space-y-1">
                 {dt.tasks.map((task, i) => (
-                  <li key={i} className="text-xs text-slate-600 flex items-start gap-1.5">
-                    <span className="text-blue-400 mt-0.5">·</span>{task}
+                  <li key={i} className="text-xs text-stone-600 flex items-start gap-1.5">
+                    <span className="text-teal-400 mt-0.5">·</span>{task}
                   </li>
                 ))}
               </ul>
@@ -65,18 +65,18 @@ export function Plan() {
   return (
     <div className="max-w-3xl space-y-8 animate-fade-up">
       <div>
-        <h1 className="font-display text-3xl font-bold text-slate-800">个性化备考计划</h1>
-        <p className="text-slate-500 mt-1 text-sm">基于你的水平和目标，AI 为你定制专属学习路径</p>
+        <h1 className="font-display text-3xl font-bold text-stone-800">个性化备考计划</h1>
+        <p className="text-stone-500 mt-1 text-sm">基于你的水平和目标，AI 为你定制专属学习路径</p>
       </div>
 
       {/* Form */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-        <h2 className="font-display text-lg font-semibold text-slate-800 mb-5">生成新计划</h2>
+      <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm">
+        <h2 className="font-display text-lg font-semibold text-stone-800 mb-5">生成新计划</h2>
         <div className="grid grid-cols-2 gap-4 mb-5">
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">当前水平</label>
+            <label className="block text-xs font-medium text-stone-500 mb-1.5">当前水平</label>
             <select
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-sm text-stone-700 bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
               value={form.current_level}
               onChange={e => setForm({ ...form, current_level: e.target.value })}
             >
@@ -86,28 +86,28 @@ export function Plan() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">目标分数 (满分120)</label>
+            <label className="block text-xs font-medium text-stone-500 mb-1.5">目标分数 (满分120)</label>
             <input
               type="number" min={60} max={120}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-sm bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
               value={form.target_score}
               onChange={e => setForm({ ...form, target_score: Number(e.target.value) })}
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">考试日期</label>
+            <label className="block text-xs font-medium text-stone-500 mb-1.5">考试日期</label>
             <input
               type="date"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-sm bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
               value={form.exam_date}
               onChange={e => setForm({ ...form, exam_date: e.target.value })}
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">每周可用时间 (小时)</label>
+            <label className="block text-xs font-medium text-stone-500 mb-1.5">每周可用时间 (小时)</label>
             <input
               type="number" min={1} max={40}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-sm bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-400"
               value={form.weekly_hours}
               onChange={e => setForm({ ...form, weekly_hours: Number(e.target.value) })}
             />
@@ -116,7 +116,7 @@ export function Plan() {
         <button
           onClick={generate}
           disabled={loading || !form.exam_date}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-medium disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-5 py-2.5 text-sm font-medium disabled:opacity-50 transition-colors"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           {loading ? 'AI 正在生成计划...' : '生成个性化计划'}
@@ -127,7 +127,7 @@ export function Plan() {
       {plan && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-xl font-semibold text-slate-800">
+            <h2 className="font-display text-xl font-semibold text-stone-800">
               你的学习计划 · {plan.plan?.total_weeks} 周
             </h2>
           </div>

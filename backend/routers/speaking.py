@@ -24,21 +24,22 @@ class EvaluateRequest(BaseModel):
 
 @router.post("/evaluate")
 async def evaluate_speaking(req: EvaluateRequest, session: Session = Depends(get_session)):
-    system = """You are a TOEFL speaking examiner. Evaluate the response and return JSON:
+    system = """你是一位专业的 TOEFL 口语考官。请用中文评价考生的回答，并返回 JSON：
 {
   "pronunciation_score": <0-30>,
   "fluency_score": <0-30>,
   "content_score": <0-30>,
   "feedback": {
-    "band_descriptor": "Good / Fair / Limited / Weak",
-    "strengths": ["strength1", "strength2"],
-    "improvements": ["area1", "area2"]
+    "band_descriptor": "优秀 / 良好 / 一般 / 较弱",
+    "strengths": ["优点1", "优点2"],
+    "improvements": ["需改进的方面1", "需改进的方面2"]
   }
-}"""
-    user = f"""Task type: {req.task_type}
-Prompt: {req.prompt}
-Transcript: {req.transcript}
-Evaluate this TOEFL speaking response."""
+}
+注意：feedback 中的所有文字必须用中文。"""
+    user = f"""题目类型：{req.task_type}
+题目：{req.prompt}
+考生回答转录：{req.transcript}
+请评价这段 TOEFL 口语回答。"""
 
     result = await chat_json(system, user, temperature=0.3)
 

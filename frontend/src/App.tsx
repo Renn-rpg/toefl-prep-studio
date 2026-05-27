@@ -14,7 +14,7 @@ export default function App() {
     <BrowserRouter>
       <div className="flex min-h-screen bg-parchment">
         <Sidebar />
-        <main className="ml-56 flex-1 p-8 min-h-screen">
+        <main className="ml-56 flex-1 p-8 min-h-screen relative z-10">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/plan" element={<Plan />} />
