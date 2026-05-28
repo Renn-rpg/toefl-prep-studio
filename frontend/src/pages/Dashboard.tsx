@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
@@ -32,15 +32,18 @@ function BentoStatCard({ icon: Icon, label, value, gradient, delay }: {
 }
 
 function HeatmapCalendar({ data }: { data: { date: string; minutes: number }[] }) {
-  const map = Object.fromEntries(data.map(d => [d.date, d.minutes]))
-  const days: { date: string; minutes: number }[] = []
-  const today = new Date()
-  for (let i = 89; i >= 0; i--) {
-    const d = new Date(today)
-    d.setDate(today.getDate() - i)
-    const key = d.toISOString().split('T')[0]
-    days.push({ date: key, minutes: map[key] ?? 0 })
-  }
+  const days = useMemo(() => {
+    const map = Object.fromEntries(data.map(d => [d.date, d.minutes]))
+    const result: { date: string; minutes: number }[] = []
+    const today = new Date()
+    for (let i = 89; i >= 0; i--) {
+      const d = new Date(today)
+      d.setDate(today.getDate() - i)
+      const key = d.toISOString().split('T')[0]
+      result.push({ date: key, minutes: map[key] ?? 0 })
+    }
+    return result
+  }, [data])
 
   function intensity(mins: number) {
     if (mins === 0) return 'bg-white/[0.04]'
@@ -79,7 +82,7 @@ function ModuleMarquee() {
     <div className="marquee">
       <div className="marquee-inner">
         {items.map(({ to, icon: Icon, label, color, desc }, i) => (
-          <button key={i} onClick={() => navigate(to)}
+          <button key={`${to}-${i}`} onClick={() => navigate(to)}
             className="flex items-center gap-3 px-5 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.12] transition-all group flex-shrink-0 cursor-pointer">
             <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center shadow-md`}>
               <Icon className="h-4 w-4 text-white" />
@@ -152,12 +155,7 @@ export function Dashboard() {
             gradient="from-emerald-500 to-emerald-400" delay={0.15} />
 
           {/* Radar chart — spans 2 cols */}
-          <motion.div
-            className="card-glow p-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.2 }}
-          >
+          <div className="glass-card-static p-6">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-300" />
               <h2 className="font-display text-lg font-semibold text-slate-100">四项技能</h2>
@@ -179,15 +177,10 @@ export function Dashboard() {
                 <p className="text-sm text-slate-400">完成练习后自动生成</p>
               </div>
             )}
-          </motion.div>
+          </div>
 
           {/* Section averages — spans 2 cols */}
-          <motion.div
-            className="card-glow p-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.25 }}
-          >
+          <div className="glass-card-static p-6">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-300" />
               <h2 className="font-display text-lg font-semibold text-slate-100">各科均分</h2>
@@ -216,12 +209,12 @@ export function Dashboard() {
                 </div>
               ))}
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Heatmap — scroll reveal */}
         <RevealSection delay={0.05}>
-          <div className="card-glow p-6">
+          <div className="glass-card-static p-6">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-300" />
               <h2 className="font-display text-lg font-semibold text-slate-100">学习热力图</h2>
