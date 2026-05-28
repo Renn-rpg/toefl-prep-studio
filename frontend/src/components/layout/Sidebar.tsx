@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import {
   LayoutDashboard, BookOpen, Headphones, Mic, PenLine,
-  FileText, ClipboardCheck, BarChart3, BookA, Menu, X
+  FileText, ClipboardCheck, BarChart3, BookA, Menu, X, ArrowLeftRight
 } from 'lucide-react'
 
 const nav = [
   { to: '/', icon: LayoutDashboard, label: '学习总览', color: 'text-brand-400' },
   { to: '/plan', icon: ClipboardCheck, label: '备考计划', color: 'text-indigo-400' },
   { to: '/vocab', icon: BookA, label: '词汇背诵', color: 'text-pink-400' },
+  { to: '/translation', icon: ArrowLeftRight, label: '句法互译', color: 'text-blue-400' },
   { to: '/listening', icon: Headphones, label: '听力练习', color: 'text-cyan-400' },
   { to: '/reading', icon: BookOpen, label: '阅读练习', color: 'text-emerald-400' },
   { to: '/speaking', icon: Mic, label: '口语练习', color: 'text-violet-400' },

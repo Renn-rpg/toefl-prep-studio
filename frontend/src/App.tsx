@@ -12,6 +12,10 @@ import { MockTest } from './pages/MockTest'
 import { Evaluation } from './pages/Evaluation'
 import { VocabDashboard } from './pages/VocabDashboard'
 import { VocabStudy } from './pages/VocabStudy'
+import { VocabQuiz } from './pages/VocabQuiz'
+import { VocabBookmark } from './pages/VocabBookmark'
+import { Translation } from './pages/Translation'
+import { VocabMastery } from './pages/VocabMastery'
 
 function AppRoutes() {
   const location = useLocation()
@@ -22,12 +26,16 @@ function AppRoutes() {
         <Route path="/plan" element={<Plan />} />
         <Route path="/vocab" element={<VocabDashboard />} />
         <Route path="/vocab/study" element={<VocabStudy />} />
+        <Route path="/vocab/quiz" element={<VocabQuiz />} />
+        <Route path="/vocab/bookmarks" element={<VocabBookmark />} />
+        <Route path="/vocab/mastery" element={<VocabMastery />} />
         <Route path="/listening" element={<Listening />} />
         <Route path="/reading" element={<Reading />} />
         <Route path="/speaking" element={<Speaking />} />
         <Route path="/writing" element={<Writing />} />
         <Route path="/mock" element={<MockTest />} />
         <Route path="/evaluation" element={<Evaluation />} />
+        <Route path="/translation" element={<Translation />} />
       </Routes>
     </AnimatePresence>
   )

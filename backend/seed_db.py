@@ -1,6 +1,6 @@
 """Run once to populate the database with sample content."""
 import json
-from sqlmodel import Session
+from sqlmodel import Session, select, func
 from database import engine, create_db_and_tables
 from models import ListeningPassage, ReadingPassage, SpeakingPrompt, WritingPrompt
 
@@ -8,6 +8,10 @@ from models import ListeningPassage, ReadingPassage, SpeakingPrompt, WritingProm
 def seed():
     create_db_and_tables()
     with Session(engine) as session:
+        existing = session.exec(select(func.count(ListeningPassage.id))).one()
+        if existing > 0:
+            print("Seed data already exists, skipping.")
+            return
         # ── Listening passages (20 total) ──
         listening_passages = [
             ListeningPassage(

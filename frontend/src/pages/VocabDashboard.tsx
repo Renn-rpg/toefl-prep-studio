@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
 import type { VocabStats, VocabSettings } from '@/types'
-import { BookA, Flame, Target, Clock, Zap, Settings, ChevronRight } from 'lucide-react'
+import { BookA, Flame, Target, Clock, Zap, Settings, ChevronRight, FileSearch, Star, Brain, Volume2 } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { StaggerContainer } from '@/components/motion/StaggerContainer'
 import { StaggerItem } from '@/components/motion/StaggerItem'
@@ -54,10 +54,12 @@ export function VocabDashboard() {
   const [stats, setStats] = useState<VocabStats | null>(null)
   const [settings, setSettings] = useState<VocabSettings | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [bookmarkCount, setBookmarkCount] = useState(0)
 
   useEffect(() => {
     api.get<VocabStats>('/vocab/stats').then(setStats).catch(() => {})
     api.get<VocabSettings>('/vocab/settings').then(setSettings).catch(() => {})
+    api.get<{ total: number }>('/vocab/bookmarks?page=1&per_page=1').then(r => setBookmarkCount(r.total)).catch(() => {})
   }, [])
 
   async function updateSettings(patch: Partial<VocabSettings>) {
@@ -141,9 +143,13 @@ export function VocabDashboard() {
               )}
             </div>
             <div className="space-y-3">
-              <button onClick={() => navigate('/vocab/study')}
+              <button onClick={() => navigate('/vocab/mastery')}
                 className="w-full btn-gradient py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
-                开始学习 <ChevronRight className="h-4 w-4" />
+                <Brain className="h-4 w-4" /> 精背模式 <ChevronRight className="h-4 w-4" />
+              </button>
+              <button onClick={() => navigate('/vocab/study')}
+                className="w-full flex items-center justify-center gap-2 text-sm text-slate-400 hover:text-slate-200 py-2.5 rounded-xl border border-white/[0.06] hover:border-white/[0.12] transition-all font-medium">
+                翻牌学习
               </button>
               <button onClick={() => setShowSettings(!showSettings)}
                 className="w-full flex items-center justify-center gap-2 text-sm text-slate-400 hover:text-slate-200 py-2 transition-colors font-medium">
@@ -151,6 +157,49 @@ export function VocabDashboard() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Quick modes */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button onClick={() => navigate('/vocab/mastery')}
+            className="glass-card-static p-5 text-left hover:border-violet-500/20 transition-colors group">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-colors">
+                <Brain className="h-5 w-5 text-violet-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-200">精背模式</p>
+                <p className="text-xs text-slate-500 mt-0.5">3阶段渐进掌握</p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-slate-600 ml-auto group-hover:text-violet-400 transition-colors" />
+            </div>
+          </button>
+          <button onClick={() => navigate('/vocab/quiz')}
+            className="glass-card-static p-5 text-left hover:border-pink-500/20 transition-colors group">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-pink-500/10 flex items-center justify-center group-hover:bg-pink-500/20 transition-colors">
+                <FileSearch className="h-5 w-5 text-pink-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-200">选择题模式</p>
+                <p className="text-xs text-slate-500 mt-0.5">看词选释义 / 看释义选词，4选1</p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-slate-600 ml-auto group-hover:text-pink-400 transition-colors" />
+            </div>
+          </button>
+          <button onClick={() => navigate('/vocab/bookmarks')}
+            className="glass-card-static p-5 text-left hover:border-pink-500/20 transition-colors group">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
+                <Star className="h-5 w-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-200">生词本</p>
+                <p className="text-xs text-slate-500 mt-0.5">{bookmarkCount > 0 ? `${bookmarkCount} 个已收藏词汇` : '暂无收藏'}</p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-slate-600 ml-auto group-hover:text-amber-400 transition-colors" />
+            </div>
+          </button>
         </div>
 
         {/* Settings panel */}
@@ -197,6 +246,33 @@ export function VocabDashboard() {
                   className="w-4 h-4 accent-pink-500 rounded" />
                 <span className="text-sm text-slate-300 font-medium">显示中文释义</span>
               </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={settings.sound_effects ?? true}
+                  onChange={e => updateSettings({ sound_effects: e.target.checked })}
+                  className="w-4 h-4 accent-pink-500 rounded" />
+                <span className="text-sm text-slate-300 font-medium">答题音效</span>
+              </label>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <Volume2 className="h-3.5 w-3.5 inline mr-1.5" />发音偏好
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => updateSettings({ preferred_accent: 'us' })}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      (settings.preferred_accent ?? 'us') === 'us'
+                        ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/25'
+                        : 'bg-white/[0.04] text-slate-400 border border-white/[0.06] hover:bg-white/[0.06]'
+                    }`}>美式</button>
+                  <button
+                    onClick={() => updateSettings({ preferred_accent: 'uk' })}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      (settings.preferred_accent ?? 'us') === 'uk'
+                        ? 'bg-violet-500/15 text-violet-400 border border-violet-500/25'
+                        : 'bg-white/[0.04] text-slate-400 border border-white/[0.06] hover:bg-white/[0.06]'
+                    }`}>英式</button>
+                </div>
+              </div>
             </div>
           </div>
         )}

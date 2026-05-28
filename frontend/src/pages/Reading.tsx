@@ -83,8 +83,9 @@ export function Reading() {
                   </div>
                   <span className={`text-[11px] px-2.5 py-1 rounded-full font-medium border capitalize ${
                     p.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : p.difficulty === 'hard' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                     : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                  }`}>{p.difficulty === 'easy' ? '简单' : '中等'}</span>
+                  }`}>{p.difficulty === 'easy' ? '简单' : p.difficulty === 'hard' ? '困难' : '中等'}</span>
                 </div>
               </button>
             </StaggerItem>

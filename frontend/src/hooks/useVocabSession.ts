@@ -16,6 +16,7 @@ export function useVocabSession() {
   const [loading, setLoading] = useState(false)
   const [finished, setFinished] = useState(false)
   const statsRef = useRef<SessionStats>({ total: 0, reviewed: 0, correct: 0, startTime: Date.now() })
+  const cardStartRef = useRef<number>(Date.now())
 
   const fetchCards = useCallback(async (limit = 20) => {
     setLoading(true)
@@ -34,7 +35,7 @@ export function useVocabSession() {
 
   const currentCard = cards[currentIndex] ?? null
 
-  const flip = useCallback(() => setFlipped(true), [])
+  const flip = useCallback(() => { setFlipped(true); cardStartRef.current = Date.now() }, [])
 
   const rate = useCallback(async (rating: number) => {
     if (!currentCard) return
@@ -47,7 +48,7 @@ export function useVocabSession() {
       await api.post('/vocab/session/review', {
         word_id: currentCard.word_id,
         rating,
-        session_duration_ms: Date.now() - statsRef.current.startTime
+        session_duration_ms: Date.now() - cardStartRef.current
       })
     } catch {}
 

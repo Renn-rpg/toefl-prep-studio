@@ -126,10 +126,16 @@ class VocabWord(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     word: str = Field(index=True, unique=True)
     phonetic: str = ""
+    phonetic_uk: str = ""
+    phonetic_us: str = ""
+    syllables: str = ""
     part_of_speech: str = ""
     definition_en: str = ""
     definition_cn: str = ""
     example_sentences_json: str = "[]"
+    collocations_json: str = "[]"
+    derivatives_json: str = "[]"
+    word_root_json: str = "{}"
     frequency_rank: int = 0
     tags_json: str = "[]"
     difficulty: int = 1
@@ -146,6 +152,8 @@ class VocabProgress(SQLModel, table=True):
     last_reviewed_at: Optional[datetime] = None
     total_reviews: int = 0
     correct_count: int = 0
+    bookmarked: bool = False
+    mastery_stage: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -166,3 +174,5 @@ class VocabSettings(SQLModel, table=True):
     daily_review_limit: int = 100
     auto_pronounce: bool = True
     show_cn_definition: bool = True
+    preferred_accent: str = "us"
+    sound_effects: bool = True

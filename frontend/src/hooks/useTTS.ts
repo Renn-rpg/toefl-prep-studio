@@ -6,15 +6,16 @@ export function useTTS() {
   const [progress, setProgress] = useState(0)
   const intervalRef = useRef<number>(0)
 
-  const speak = useCallback((text: string, rate = 0.9) => {
+  const speak = useCallback((text: string, rate = 0.9, accent: 'us' | 'uk' = 'us') => {
     window.speechSynthesis.cancel()
     const utter = new SpeechSynthesisUtterance(text)
-    utter.lang = 'en-US'
+    const lang = accent === 'uk' ? 'en-GB' : 'en-US'
+    utter.lang = lang
     utter.rate = rate
     utter.pitch = 1
 
     const voices = window.speechSynthesis.getVoices()
-    const preferred = voices.find(v => v.lang === 'en-US' && v.name.includes('Female'))
+    const preferred = voices.find(v => v.lang === lang)
       ?? voices.find(v => v.lang === 'en-US')
     if (preferred) utter.voice = preferred
 

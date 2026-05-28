@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
 import { useTTS } from '@/hooks/useTTS'
 import type { ListeningPassage, ListeningPassageDetail, Question } from '@/types'
-import { Headphones, ChevronLeft, Play, Pause, RotateCcw, Volume2 } from 'lucide-react'
+import { Headphones, ChevronLeft, Play, Pause, RotateCcw, Volume2, SkipBack, SkipForward, Sparkles } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { StaggerContainer } from '@/components/motion/StaggerContainer'
 import { StaggerItem } from '@/components/motion/StaggerItem'
@@ -28,6 +28,8 @@ export function Listening() {
   const [result, setResult] = useState<{ score: number; total_questions: number } | null>(null)
   const [showTranscript, setShowTranscript] = useState(false)
   const [playbackRate, setPlaybackRate] = useState(0.9)
+  const [generatingAudio, setGeneratingAudio] = useState(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
   const tts = useTTS()
 
   useEffect(() => { api.get<ListeningPassage[]>('/listening/passages').then(setPassages) }, [])
@@ -40,6 +42,27 @@ export function Listening() {
   }
 
   function handleBack() { tts.stop(); setSelected(null) }
+
+  const hasAudio = selected?.audio_url && selected.audio_url.length > 0
+
+  async function generateAudio() {
+    if (!selected) return
+    setGeneratingAudio(true)
+    try {
+      const res = await api.post<{ audio_url: string }>(`/listening/generate-audio/${selected.id}`, {})
+      setSelected({ ...selected, audio_url: res.audio_url })
+    } finally {
+      setGeneratingAudio(false)
+    }
+  }
+
+  const skipBack = useCallback(() => {
+    if (audioRef.current) audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10)
+  }, [])
+
+  const skipForward = useCallback(() => {
+    if (audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.duration || Infinity, audioRef.current.currentTime + 10)
+  }, [])
 
   async function submit() {
     if (!selected) return
@@ -127,43 +150,87 @@ export function Listening() {
             <div className="flex items-center gap-2 mb-3">
               <Volume2 className="h-4 w-4 text-cyan-400" />
               <span className="text-sm font-medium text-slate-200">语音朗读</span>
-              <span className="text-[11px] text-slate-500">（浏览器 TTS）</span>
+              <span className="text-[11px] text-slate-500">
+                {hasAudio ? '（Edge TTS / 真人音频）' : '（浏览器 TTS）'}
+              </span>
             </div>
-            <div className="flex items-center gap-3">
-              {!tts.speaking ? (
-                <button onClick={() => tts.speak(selected.transcript, playbackRate)}
-                  className="flex items-center gap-1.5 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg px-4 py-2 text-sm font-medium transition-all shadow-lg shadow-cyan-500/25">
-                  <Play className="h-4 w-4" /> 播放
-                </button>
-              ) : (
-                <button onClick={tts.pause}
-                  className="flex items-center gap-1.5 bg-white/[0.08] hover:bg-white/[0.12] text-slate-200 rounded-lg px-4 py-2 text-sm font-medium transition-all">
-                  <Pause className="h-4 w-4" /> 暂停
-                </button>
-              )}
-              <button onClick={() => tts.stop()}
-                className="flex items-center gap-1.5 bg-white/[0.05] hover:bg-white/[0.08] text-slate-300 rounded-lg px-3 py-2 text-sm transition-colors border border-white/[0.08]">
-                <RotateCcw className="h-4 w-4" /> 重播
-              </button>
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="text-xs text-slate-500">语速</span>
-                {[0.7, 0.9, 1.0, 1.2].map(rate => (
-                  <button key={rate} onClick={() => setPlaybackRate(rate)}
-                    className={`text-xs px-2.5 py-1.5 rounded-lg transition-all font-medium ${
-                      playbackRate === rate
-                        ? 'bg-cyan-500/15 text-cyan-400'
-                        : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'
-                    }`}>
-                    {rate}x
+
+            {hasAudio ? (
+              <div className="space-y-3">
+                <audio
+                  ref={audioRef}
+                  src={`http://localhost:8000${selected.audio_url}`}
+                  controls
+                  className="w-full h-9 [&::-webkit-media-controls-panel]:bg-white/[0.06] [&::-webkit-media-controls-current-time-display]:text-slate-300 [&::-webkit-media-controls-time-remaining-display]:text-slate-500"
+                />
+                <div className="flex items-center gap-2">
+                  <button onClick={skipBack}
+                    className="flex items-center gap-1 bg-white/[0.05] hover:bg-white/[0.08] text-slate-300 rounded-lg px-3 py-1.5 text-xs transition-colors border border-white/[0.08]">
+                    <SkipBack className="h-3.5 w-3.5" /> 后退10s
                   </button>
-                ))}
+                  <button onClick={skipForward}
+                    className="flex items-center gap-1 bg-white/[0.05] hover:bg-white/[0.08] text-slate-300 rounded-lg px-3 py-1.5 text-xs transition-colors border border-white/[0.08]">
+                    <SkipForward className="h-3.5 w-3.5" /> 快进10s
+                  </button>
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <span className="text-[11px] text-slate-500">速率</span>
+                    {[0.75, 1.0, 1.25, 1.5].map(rate => (
+                      <button key={rate} onClick={() => { if (audioRef.current) audioRef.current.playbackRate = rate }}
+                        className={`text-[11px] px-2 py-1 rounded-lg transition-all font-medium ${
+                          audioRef.current?.playbackRate === rate
+                            ? 'bg-cyan-500/15 text-cyan-400'
+                            : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'
+                        }`}>
+                        {rate}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-            {tts.speaking && (
-              <div className="mt-3 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full transition-all duration-200"
-                  style={{ width: `${tts.progress * 100}%` }} />
-              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  {!tts.speaking ? (
+                    <button onClick={() => tts.speak(selected.transcript, playbackRate)}
+                      className="flex items-center gap-1.5 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg px-4 py-2 text-sm font-medium transition-all shadow-lg shadow-cyan-500/25">
+                      <Play className="h-4 w-4" /> TTS 播放
+                    </button>
+                  ) : (
+                    <button onClick={tts.pause}
+                      className="flex items-center gap-1.5 bg-white/[0.08] hover:bg-white/[0.12] text-slate-200 rounded-lg px-4 py-2 text-sm font-medium transition-all">
+                      <Pause className="h-4 w-4" /> 暂停
+                    </button>
+                  )}
+                  <button onClick={() => tts.stop()}
+                    className="flex items-center gap-1.5 bg-white/[0.05] hover:bg-white/[0.08] text-slate-300 rounded-lg px-3 py-2 text-sm transition-colors border border-white/[0.08]">
+                    <RotateCcw className="h-4 w-4" /> 重播
+                  </button>
+                  <button onClick={generateAudio} disabled={generatingAudio}
+                    className="flex items-center gap-1.5 bg-gradient-to-r from-cyan-500/20 to-cyan-400/10 hover:from-cyan-500/30 hover:to-cyan-400/20 text-cyan-400 rounded-lg px-3 py-2 text-xs font-medium transition-all border border-cyan-500/20 ml-auto disabled:opacity-50">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {generatingAudio ? '生成中…' : '生成自然语音'}
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">语速</span>
+                    {[0.7, 0.9, 1.0, 1.2].map(rate => (
+                      <button key={rate} onClick={() => setPlaybackRate(rate)}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg transition-all font-medium ${
+                          playbackRate === rate
+                            ? 'bg-cyan-500/15 text-cyan-400'
+                            : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'
+                        }`}>
+                        {rate}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {tts.speaking && (
+                  <div className="mt-3 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full transition-all duration-200"
+                      style={{ width: `${tts.progress * 100}%` }} />
+                  </div>
+                )}
+              </>
             )}
           </div>
 

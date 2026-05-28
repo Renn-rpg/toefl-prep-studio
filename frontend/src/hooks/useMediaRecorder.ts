@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 type RecorderState = 'idle' | 'recording' | 'stopped'
 
@@ -7,6 +7,12 @@ export function useMediaRecorder() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl)
+    }
+  }, [audioUrl])
 
   async function start() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })

@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlmodel import Session, select, func
-from typing import Optional
 
 from database import get_session
 from models import DailyActivity, ListeningSession, SpeakingSession, ReadingSession, WritingSession, StageEvaluation
@@ -29,6 +28,7 @@ def log_activity(req: ActivityRequest, session: Session = Depends(get_session)):
         new_modules = set(json.loads(req.modules_practiced))
         existing.modules_practiced = json.dumps(list(existing_modules | new_modules))
         session.add(existing)
+        session.commit()
     else:
         activity = DailyActivity(
             activity_date=req.activity_date,
@@ -36,8 +36,23 @@ def log_activity(req: ActivityRequest, session: Session = Depends(get_session)):
             modules_practiced=req.modules_practiced,
         )
         session.add(activity)
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            existing = session.exec(
+                select(DailyActivity).where(DailyActivity.activity_date == req.activity_date)
+            ).first()
+            if existing:
+                existing.minutes_studied += req.minutes_studied
+                existing_modules = set(json.loads(existing.modules_practiced))
+                new_modules = set(json.loads(req.modules_practiced))
+                existing.modules_practiced = json.dumps(list(existing_modules | new_modules))
+                session.add(existing)
+                session.commit()
+            else:
+                raise
 
-    session.commit()
     return {"status": "ok"}
 
 

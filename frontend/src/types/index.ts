@@ -171,4 +171,128 @@ export interface VocabSettings {
   daily_review_limit: number
   auto_pronounce: boolean
   show_cn_definition: boolean
+  preferred_accent: 'us' | 'uk'
+  sound_effects: boolean
+}
+
+export interface QuizOption {
+  text: string
+  key: string
+}
+
+export interface QuizQuestion {
+  word_id: number
+  prompt: string
+  prompt_sub: string
+  options: QuizOption[]
+  correct_key: string
+}
+
+export interface QuizSession {
+  quiz_id: string
+  mode: string
+  questions: QuizQuestion[]
+}
+
+export interface QuizResultItem {
+  word_id: number
+  word: string
+  selected: string
+  correct_answer: string
+  correct_answer_text?: string
+  is_correct: boolean
+}
+
+export interface QuizResult {
+  score: number
+  total: number
+  results: QuizResultItem[]
+}
+
+export interface BookmarkedWord {
+  id: number
+  word: string
+  phonetic: string
+  part_of_speech: string
+  definition_en: string
+  definition_cn: string
+  example_sentences: VocabExampleSentence[]
+  difficulty: number
+  status: string
+  bookmarked: boolean
+}
+
+export interface BookmarkList {
+  words: BookmarkedWord[]
+  total: number
+  page: number
+  per_page: number
+}
+
+// ── Mastery mode types ──
+
+export interface WordDerivative {
+  word: string
+  pos: string
+  cn: string
+}
+
+export interface WordRoot {
+  root: string
+  meaning: string
+  origin: string
+}
+
+export interface MasteryOption {
+  text: string
+  key: string
+}
+
+export interface MasteryWord {
+  word_id: number
+  word: string
+  phonetic: string
+  phonetic_uk: string
+  phonetic_us: string
+  syllables: string
+  part_of_speech: string
+  definition_en: string
+  definition_cn: string
+  example_sentences: VocabExampleSentence[]
+  collocations: string[]
+  derivatives: WordDerivative[]
+  word_root: WordRoot
+  mastery_stage: number
+  status: string
+  stage1_options: MasteryOption[]
+  stage1_correct_key: string
+  stage2_options: MasteryOption[]
+  stage2_correct_key: string
+}
+
+export interface MasterySession {
+  words: MasteryWord[]
+  total: number
+}
+
+export interface MasteryAnswerResponse {
+  status: string
+  mastery_stage: number
+  session_mastered: boolean
+  progress: {
+    status: string
+    interval_days: number
+    next_review_at: string
+    repetitions: number
+  }
+}
+
+export interface TranslationSentence {
+  chinese: string
+  english: string
+  blanks: { position: string; hint: string }[]
+}
+
+export interface TranslationSet {
+  sentences: TranslationSentence[]
 }

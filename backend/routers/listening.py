@@ -1,10 +1,13 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException
+import os
+import shutil
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from database import get_session
 from models import ListeningPassage, ListeningSession
+from audio_generator import generate_audio, AUDIO_DIR
 
 router = APIRouter()
 
@@ -55,3 +58,46 @@ def submit_answer(req: AnswerRequest, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(ls)
     return {"session_id": ls.id, "score": score, "total_questions": len(questions)}
+
+
+@router.post("/generate-audio/{passage_id}")
+async def generate_passage_audio(passage_id: int, session: Session = Depends(get_session)):
+    passage = session.get(ListeningPassage, passage_id)
+    if not passage:
+        raise HTTPException(status_code=404, detail="Passage not found")
+
+    if not passage.transcript:
+        raise HTTPException(status_code=400, detail="Passage has no transcript")
+
+    audio_url = await generate_audio(passage.transcript, passage.passage_type, passage_id)
+    passage.audio_url = audio_url
+    session.add(passage)
+    session.commit()
+
+    return {"audio_url": audio_url, "passage_id": passage_id}
+
+
+@router.post("/upload-audio/{passage_id}")
+async def upload_passage_audio(
+    passage_id: int,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+):
+    passage = session.get(ListeningPassage, passage_id)
+    if not passage:
+        raise HTTPException(status_code=404, detail="Passage not found")
+
+    if not file.filename or not file.filename.lower().endswith(".mp3"):
+        raise HTTPException(status_code=400, detail="Only MP3 files are accepted")
+
+    os.makedirs(AUDIO_DIR, exist_ok=True)
+    filepath = os.path.join(AUDIO_DIR, f"{passage_id}.mp3")
+    with open(filepath, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    audio_url = f"/audio/{passage_id}.mp3"
+    passage.audio_url = audio_url
+    session.add(passage)
+    session.commit()
+
+    return {"audio_url": audio_url, "passage_id": passage_id}

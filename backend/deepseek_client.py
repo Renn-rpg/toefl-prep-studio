@@ -32,4 +32,7 @@ async def chat_json(system: str, user: str, temperature: float = 0.3) -> dict:
         )
         response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
-        return json.loads(content)
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            return {"raw": content, "error": "DeepSeek returned non-JSON response"}
