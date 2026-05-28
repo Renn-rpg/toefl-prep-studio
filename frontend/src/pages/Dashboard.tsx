@@ -1,38 +1,33 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
 import type { DashboardData } from '@/types'
 import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer
 } from 'recharts'
-import { Flame, Clock, TrendingUp, BookOpen, Mic, PenLine, Headphones } from 'lucide-react'
+import { Flame, Clock, TrendingUp, BookOpen, Mic, PenLine, Headphones, BookA, FileText, BarChart3, ClipboardCheck, ChevronRight } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
-import { StaggerContainer } from '@/components/motion/StaggerContainer'
-import { StaggerItem } from '@/components/motion/StaggerItem'
+import { RevealSection } from '@/components/motion/RevealSection'
+import { motion } from 'motion/react'
 
-function StatCard({ icon: Icon, label, value, color }: {
+function BentoStatCard({ icon: Icon, label, value, gradient, delay }: {
   icon: React.ElementType; label: string; value: string | number
-  color: 'cyan' | 'violet' | 'amber' | 'emerald'
+  gradient: string; delay: number
 }) {
-  const palettes = {
-    cyan:    { iconBg: 'bg-gradient-to-br from-cyan-500 to-cyan-400', accent: 'from-cyan-500 to-cyan-400' },
-    violet:  { iconBg: 'bg-gradient-to-br from-violet-500 to-violet-400', accent: 'from-violet-400 to-violet-300' },
-    amber:   { iconBg: 'bg-gradient-to-br from-amber-500 to-amber-400', accent: 'from-amber-400 to-amber-300' },
-    emerald: { iconBg: 'bg-gradient-to-br from-emerald-500 to-emerald-400', accent: 'from-emerald-400 to-emerald-300' },
-  }
-  const p = palettes[color]
-
   return (
-    <div className="glass-card relative overflow-hidden p-5 group">
-      <div className={`absolute top-0 left-6 right-6 h-[3px] rounded-b-full bg-gradient-to-r ${p.accent} opacity-30 group-hover:opacity-60 transition-opacity duration-300`} />
-      <div className="mt-1.5">
-        <div className={`inline-flex p-2.5 rounded-xl mb-3 ${p.iconBg} shadow-lg`}>
-          <Icon className="h-5 w-5 text-white" />
-        </div>
-        <div className="font-mono text-[2rem] font-bold text-slate-100 leading-none">{value}</div>
-        <div className="text-[13px] text-slate-400 mt-1.5 font-medium">{label}</div>
+    <motion.div
+      className="card-glow p-6 group"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 24, delay }}
+    >
+      <div className={`inline-flex p-2.5 rounded-xl mb-4 bg-gradient-to-br ${gradient} shadow-lg`}>
+        <Icon className="h-5 w-5 text-white" />
       </div>
-    </div>
+      <div className="font-mono text-[2.5rem] font-bold text-slate-100 leading-none tracking-tight">{value}</div>
+      <div className="text-[13px] text-slate-400 mt-2 font-medium">{label}</div>
+    </motion.div>
   )
 }
 
@@ -65,6 +60,42 @@ function HeatmapCalendar({ data }: { data: { date: string; minutes: number }[] }
   )
 }
 
+const modules = [
+  { to: '/plan', icon: ClipboardCheck, label: '备考计划', color: 'from-indigo-500 to-violet-500', desc: 'AI 定制学习路径' },
+  { to: '/vocab', icon: BookA, label: '词汇背诵', color: 'from-pink-500 to-rose-400', desc: '400 核心词 SRS' },
+  { to: '/listening', icon: Headphones, label: '听力练习', color: 'from-cyan-500 to-cyan-400', desc: 'TTS 语音训练' },
+  { to: '/reading', icon: BookOpen, label: '阅读练习', color: 'from-emerald-500 to-emerald-400', desc: '文章精读答题' },
+  { to: '/speaking', icon: Mic, label: '口语练习', color: 'from-violet-500 to-violet-400', desc: 'AI 三维评分' },
+  { to: '/writing', icon: PenLine, label: '写作练习', color: 'from-amber-500 to-amber-400', desc: 'AI 批改反馈' },
+  { to: '/mock', icon: FileText, label: '模拟考试', color: 'from-red-500 to-rose-400', desc: '四节计时模考' },
+  { to: '/evaluation', icon: BarChart3, label: '阶段评估', color: 'from-teal-500 to-teal-400', desc: '趋势追踪' },
+]
+
+function ModuleMarquee() {
+  const navigate = useNavigate()
+  const items = [...modules, ...modules]
+
+  return (
+    <div className="marquee">
+      <div className="marquee-inner">
+        {items.map(({ to, icon: Icon, label, color, desc }, i) => (
+          <button key={i} onClick={() => navigate(to)}
+            className="flex items-center gap-3 px-5 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.12] transition-all group flex-shrink-0 cursor-pointer">
+            <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center shadow-md`}>
+              <Icon className="h-4 w-4 text-white" />
+            </div>
+            <div className="text-left">
+              <div className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors">{label}</div>
+              <div className="text-[11px] text-slate-500">{desc}</div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-slate-400 transition-colors ml-2" />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
 
@@ -85,51 +116,55 @@ export function Dashboard() {
 
   const hasRadarData = radarData.some(d => d.score > 0)
 
-  const stats = [
-    { icon: Flame, label: '连续学习天数', value: data?.streak_days ?? 0, color: 'amber' as const },
-    { icon: Clock, label: '总学习时间 (分钟)', value: data?.total_minutes ?? 0, color: 'cyan' as const },
-    { icon: Headphones, label: '听力均分', value: data?.section_averages.listening ?? 0, color: 'emerald' as const },
-    { icon: TrendingUp, label: '口语均分', value: data?.section_averages.speaking ?? 0, color: 'violet' as const },
-  ]
-
   return (
     <PageTransition>
       <div className="max-w-full lg:max-w-5xl space-y-10">
         {/* Hero banner */}
         <div className="hero-image-overlay rounded-2xl -mx-2 overflow-hidden">
-          <img src={MEDIA.dashboard.hero} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
-          <div className="relative z-[2] p-8 md:p-10">
-            <p className="text-[13px] text-slate-400 mb-1 font-medium">{dateStr}</p>
-            <h1 className="font-display text-[2rem] font-bold text-slate-100 tracking-tight leading-tight">
-              {greeting}
+          <img src={MEDIA.dashboard.hero} alt="" className="absolute inset-0 w-full h-full object-cover opacity-25" />
+          <div className="relative z-[2] p-8 md:p-12">
+            <p className="text-[13px] text-slate-400 mb-2 font-medium tracking-wide">{dateStr}</p>
+            <h1 className="font-display text-[2.5rem] md:text-[3rem] font-bold tracking-tight leading-[1.1]">
+              <span className="text-slate-100">{greeting}</span>
             </h1>
-            <div className="mt-4 flex items-center gap-3">
-              <div className="h-[3px] w-12 bg-gradient-to-r from-brand-400 to-brand-400/0 rounded-full" />
-              <span className="text-xs text-slate-500 uppercase tracking-[0.15em] font-medium">Learning Dashboard</span>
+            <div className="mt-3">
+              <span className="text-gradient-flow font-display text-lg font-semibold">TOEFL Prep Studio</span>
+            </div>
+            <div className="mt-5 flex items-center gap-3">
+              <div className="h-[3px] w-16 bg-gradient-to-r from-indigo-500 via-violet-500 to-transparent rounded-full" />
+              <span className="text-xs text-slate-500 uppercase tracking-[0.2em] font-medium">Learning Dashboard</span>
             </div>
           </div>
         </div>
 
-        {/* Stat cards */}
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((s) => (
-            <StaggerItem key={s.label}>
-              <StatCard {...s} />
-            </StaggerItem>
-          ))}
-        </StaggerContainer>
+        {/* Module marquee */}
+        <RevealSection delay={0.1}>
+          <ModuleMarquee />
+        </RevealSection>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Radar chart */}
-          <div className="glass-card-static p-6">
+        {/* Bento stat grid */}
+        <div className="bento-grid">
+          <BentoStatCard icon={Flame} label="连续学习天数" value={data?.streak_days ?? 0}
+            gradient="from-amber-500 to-amber-400" delay={0.05} />
+          <BentoStatCard icon={Clock} label="总学习分钟" value={data?.total_minutes ?? 0}
+            gradient="from-cyan-500 to-cyan-400" delay={0.1} />
+          <BentoStatCard icon={Headphones} label="听力均分" value={data?.section_averages.listening ?? 0}
+            gradient="from-emerald-500 to-emerald-400" delay={0.15} />
+
+          {/* Radar chart — spans 2 cols */}
+          <motion.div
+            className="card-glow p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.2 }}
+          >
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-300" />
-              <h2 className="font-display text-lg font-semibold text-slate-100">四项技能分布</h2>
+              <h2 className="font-display text-lg font-semibold text-slate-100">四项技能</h2>
             </div>
-            <p className="text-xs text-slate-500 mb-5">听力 · 阅读 · 口语 · 写作</p>
-
+            <p className="text-xs text-slate-500 mb-4">听力 · 阅读 · 口语 · 写作</p>
             {hasRadarData ? (
-              <ResponsiveContainer width="100%" height={240}>
+              <ResponsiveContainer width="100%" height={200}>
                 <RadarChart data={radarData}>
                   <PolarGrid stroke="#2A2A3A" strokeWidth={0.8} />
                   <PolarAngleAxis dataKey="subject" tick={{ fontSize: 13, fill: '#94A3B8', fontWeight: 500 }} />
@@ -137,38 +172,38 @@ export function Dashboard() {
                 </RadarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[240px] flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center">
-                  <TrendingUp className="h-7 w-7 text-slate-600" />
+              <div className="h-[200px] flex flex-col items-center justify-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-slate-600" />
                 </div>
-                <div className="text-center">
-                  <p className="text-sm text-slate-400 font-medium">暂无技能数据</p>
-                  <p className="text-xs text-slate-500 mt-1">完成各模块练习后自动生成</p>
-                </div>
+                <p className="text-sm text-slate-400">完成练习后自动生成</p>
               </div>
             )}
-          </div>
+          </motion.div>
 
-          {/* Section averages */}
-          <div className="glass-card-static p-6">
+          {/* Section averages — spans 2 cols */}
+          <motion.div
+            className="card-glow p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.25 }}
+          >
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-300" />
-              <h2 className="font-display text-lg font-semibold text-slate-100">各科均分详情</h2>
+              <h2 className="font-display text-lg font-semibold text-slate-100">各科均分</h2>
             </div>
-            <p className="text-xs text-slate-500 mb-6">满分均为 30 分</p>
-
-            <div className="space-y-6">
+            <p className="text-xs text-slate-500 mb-5">满分均为 30 分</p>
+            <div className="space-y-5">
               {[
-                { label: '听力 Listening', score: data?.section_averages.listening ?? 0, bar: 'bg-gradient-to-r from-cyan-500 to-cyan-400', text: 'text-cyan-400', icon: Headphones },
-                { label: '阅读 Reading', score: data?.section_averages.reading ?? 0, bar: 'bg-gradient-to-r from-emerald-500 to-emerald-400', text: 'text-emerald-400', icon: BookOpen },
-                { label: '口语 Speaking', score: data?.section_averages.speaking ?? 0, bar: 'bg-gradient-to-r from-violet-500 to-violet-400', text: 'text-violet-400', icon: Mic },
-                { label: '写作 Writing', score: data?.section_averages.writing ?? 0, bar: 'bg-gradient-to-r from-amber-500 to-amber-400', text: 'text-amber-400', icon: PenLine },
+                { label: '听力', score: data?.section_averages.listening ?? 0, bar: 'bg-gradient-to-r from-cyan-500 to-cyan-400', text: 'text-cyan-400', icon: Headphones },
+                { label: '阅读', score: data?.section_averages.reading ?? 0, bar: 'bg-gradient-to-r from-emerald-500 to-emerald-400', text: 'text-emerald-400', icon: BookOpen },
+                { label: '口语', score: data?.section_averages.speaking ?? 0, bar: 'bg-gradient-to-r from-violet-500 to-violet-400', text: 'text-violet-400', icon: Mic },
+                { label: '写作', score: data?.section_averages.writing ?? 0, bar: 'bg-gradient-to-r from-amber-500 to-amber-400', text: 'text-amber-400', icon: PenLine },
               ].map(({ label, score, bar, text, icon: Icon }) => (
                 <div key={label}>
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-slate-300 font-medium flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-slate-500" />
-                      {label}
+                      <Icon className="h-4 w-4 text-slate-500" />{label}
                     </span>
                     <span className={`font-mono font-bold ${text}`}>
                       {score}<span className="text-slate-500 font-normal text-xs">/30</span>
@@ -181,26 +216,27 @@ export function Dashboard() {
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
 
-        {/* Heatmap */}
-        <div className="glass-card-static p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-300" />
-            <h2 className="font-display text-lg font-semibold text-slate-100">学习热力图</h2>
+        {/* Heatmap — scroll reveal */}
+        <RevealSection delay={0.05}>
+          <div className="card-glow p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-300" />
+              <h2 className="font-display text-lg font-semibold text-slate-100">学习热力图</h2>
+            </div>
+            <p className="text-xs text-slate-500 mb-5">近 90 天学习活跃度分布</p>
+            <HeatmapCalendar data={data?.heatmap ?? []} />
+            <div className="flex items-center gap-1.5 mt-4 text-[11px] text-slate-500">
+              <span>少</span>
+              {['bg-white/[0.04]', 'bg-indigo-900/40', 'bg-indigo-700/50', 'bg-indigo-500/60', 'bg-indigo-400/70'].map(c => (
+                <div key={c} className={`w-[13px] h-[13px] rounded-[3px] ${c}`} />
+              ))}
+              <span>多</span>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 mb-5">近 90 天学习活跃度分布</p>
-
-          <HeatmapCalendar data={data?.heatmap ?? []} />
-          <div className="flex items-center gap-1.5 mt-4 text-[11px] text-slate-500">
-            <span>少</span>
-            {['bg-white/[0.04]', 'bg-indigo-900/40', 'bg-indigo-700/50', 'bg-indigo-500/60', 'bg-indigo-400/70'].map(c => (
-              <div key={c} className={`w-[13px] h-[13px] rounded-[3px] ${c}`} />
-            ))}
-            <span>多</span>
-          </div>
-        </div>
+        </RevealSection>
       </div>
     </PageTransition>
   )

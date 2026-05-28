@@ -5,6 +5,7 @@ import type { StageEval } from '@/types'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Plus, BarChart3 } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
+import { RevealSection } from '@/components/motion/RevealSection'
 
 export function Evaluation() {
   const [history, setHistory] = useState<StageEval[]>([])
@@ -102,7 +103,7 @@ export function Evaluation() {
 
         {/* Trend chart */}
         {trendData.length > 0 && (
-          <div className="glass-card-static p-6">
+          <RevealSection><div className="card-glow p-6">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-teal-500 to-teal-300" />
               <h2 className="font-display text-lg font-semibold text-slate-100">成绩趋势</h2>
@@ -129,7 +130,7 @@ export function Evaluation() {
                 <Line type="monotone" dataKey="写作" stroke="#F59E0B" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </div></RevealSection>
         )}
 
         {/* History list */}

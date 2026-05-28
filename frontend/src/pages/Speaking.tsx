@@ -78,7 +78,7 @@ export function Speaking() {
           {prompts.map((p) => (
             <StaggerItem key={p.id}>
               <button onClick={() => setSelected(p)}
-                className="w-full text-left glass-card p-5">
+                className="w-full text-left card-glow p-5">
                 <div className="flex items-center gap-2 mb-2.5">
                   <span className={`text-[11px] px-2.5 py-1 rounded-full font-medium border ${
                     p.task_type === 'independent'

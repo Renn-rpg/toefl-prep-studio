@@ -55,7 +55,7 @@ export function Writing() {
           {prompts.map((p) => (
             <StaggerItem key={p.id}>
               <button onClick={() => { setSelected(p); setResult(null); setEssay('') }}
-                className="w-full text-left glass-card p-5">
+                className="w-full text-left card-glow p-5">
                 <span className={`text-[11px] px-2.5 py-1 rounded-full font-medium border ${
                   p.task_type === 'independent'
                     ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'

@@ -73,7 +73,7 @@ export function Reading() {
           {passages.map((p) => (
             <StaggerItem key={p.id}>
               <button onClick={() => selectPassage(p.id)}
-                className="w-full text-left glass-card p-5 group">
+                className="w-full text-left card-glow p-5 group">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-11 h-11 bg-emerald-500/10 rounded-xl flex items-center justify-center group-hover:bg-emerald-500/15 transition-colors">

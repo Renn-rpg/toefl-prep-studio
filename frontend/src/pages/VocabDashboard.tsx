@@ -20,7 +20,7 @@ function StatCard({ icon: Icon, label, value, color }: {
   const p = palettes[color]
 
   return (
-    <div className="glass-card relative overflow-hidden p-5 group">
+    <div className="card-glow relative overflow-hidden p-5 group">
       <div className={`absolute top-0 left-6 right-6 h-[3px] rounded-b-full bg-gradient-to-r ${p.accent} opacity-30 group-hover:opacity-60 transition-opacity duration-300`} />
       <div className="mt-1.5">
         <div className={`inline-flex p-2.5 rounded-xl mb-3 ${p.iconBg} shadow-lg`}>

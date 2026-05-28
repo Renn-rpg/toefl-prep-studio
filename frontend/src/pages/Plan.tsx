@@ -75,7 +75,7 @@ export function Plan() {
               </div>
               <div>
                 <h1 className="font-display text-[1.75rem] font-bold text-slate-100 tracking-tight">个性化备考计划</h1>
-                <p className="text-slate-400 text-sm">基于你的水平和目标，AI 定制专属学习路径</p>
+                <p className="text-slate-400 text-sm">基于你的水平和目标 · <span className="text-gradient-flow font-medium">AI 定制专属学习路径</span></p>
               </div>
             </div>
           </div>

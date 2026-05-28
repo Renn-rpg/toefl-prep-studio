@@ -78,7 +78,7 @@ export function Listening() {
             <StaggerItem key={p.id}>
               <button
                 onClick={() => selectPassage(p.id)}
-                className="w-full text-left glass-card p-5 group"
+                className="w-full text-left card-glow p-5 group"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">

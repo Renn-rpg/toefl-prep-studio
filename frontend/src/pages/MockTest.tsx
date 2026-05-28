@@ -64,7 +64,7 @@ export function MockTest() {
               </div>
               <div>
                 <h1 className="font-display text-[1.75rem] font-bold text-slate-100 tracking-tight">模拟考试</h1>
-                <p className="text-slate-400 text-sm">完整 TOEFL 模拟，四节计时测试</p>
+                <p className="text-slate-400 text-sm">完整 TOEFL 模拟 · <span className="text-gradient-flow font-medium">四节计时测试</span></p>
               </div>
             </div>
           </div>
