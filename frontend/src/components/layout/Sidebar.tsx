@@ -1,19 +1,21 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { motion } from 'motion/react'
 import {
   LayoutDashboard, BookOpen, Headphones, Mic, PenLine,
-  FileText, ClipboardCheck, BarChart3
+  FileText, ClipboardCheck, BarChart3, BookA, Menu, X
 } from 'lucide-react'
 
 const nav = [
-  { to: '/', icon: LayoutDashboard, label: '学习总览' },
-  { to: '/plan', icon: ClipboardCheck, label: '备考计划' },
-  { to: '/listening', icon: Headphones, label: '听力练习' },
-  { to: '/reading', icon: BookOpen, label: '阅读练习' },
-  { to: '/speaking', icon: Mic, label: '口语练习' },
-  { to: '/writing', icon: PenLine, label: '写作练习' },
-  { to: '/mock', icon: FileText, label: '模拟考试' },
-  { to: '/evaluation', icon: BarChart3, label: '阶段评估' },
+  { to: '/', icon: LayoutDashboard, label: '学习总览', color: 'text-brand-400' },
+  { to: '/plan', icon: ClipboardCheck, label: '备考计划', color: 'text-indigo-400' },
+  { to: '/vocab', icon: BookA, label: '词汇背诵', color: 'text-pink-400' },
+  { to: '/listening', icon: Headphones, label: '听力练习', color: 'text-cyan-400' },
+  { to: '/reading', icon: BookOpen, label: '阅读练习', color: 'text-emerald-400' },
+  { to: '/speaking', icon: Mic, label: '口语练习', color: 'text-violet-400' },
+  { to: '/writing', icon: PenLine, label: '写作练习', color: 'text-amber-400' },
+  { to: '/mock', icon: FileText, label: '模拟考试', color: 'text-red-400' },
+  { to: '/evaluation', icon: BarChart3, label: '阶段评估', color: 'text-teal-400' },
 ]
 
 function Clock() {
@@ -27,71 +29,122 @@ function Clock() {
   const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好'
 
   return (
-    <div className="px-4 py-4 border-t border-stone-700/40">
-      <div className="text-[11px] text-stone-500 mb-1 font-medium">{greeting}</div>
-      <div className="font-mono text-xl text-teal-400 tracking-widest tabular-nums">
+    <div className="px-4 py-4">
+      <div className="text-[11px] text-slate-500 mb-1 font-medium">{greeting}</div>
+      <div className="font-mono text-lg text-brand-400 tracking-widest tabular-nums">
         {time.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
       </div>
-      <div className="text-[10px] text-stone-600 mt-0.5">
+      <div className="text-[10px] text-slate-600 mt-0.5">
         {time.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
       </div>
     </div>
   )
 }
 
-export function Sidebar() {
+function SidebarContent({ onClose }: { onClose?: () => void }) {
+  const location = useLocation()
+
   return (
-    <aside className="fixed left-0 top-0 h-screen w-56 bg-gradient-to-b from-stone-900 to-stone-950 flex flex-col z-40 border-r border-stone-800/40 shadow-2xl shadow-stone-950/50">
+    <>
       {/* Logo */}
-      <div className="px-5 pt-7 pb-5 border-b border-stone-800/40">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/20">
-            <span className="text-white font-display font-bold text-base">T</span>
+      <div className="px-5 pt-7 pb-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+              <span className="text-white font-display font-bold text-base">T</span>
+            </div>
+            <div>
+              <div className="font-display font-bold text-slate-100 text-[15px] leading-tight tracking-wide">TOEFL</div>
+              <div className="text-[10px] text-slate-500 tracking-[0.2em] uppercase font-medium">Prep Studio</div>
+            </div>
           </div>
-          <div>
-            <div className="font-display font-bold text-stone-100 text-[15px] leading-tight tracking-wide">TOEFL</div>
-            <div className="text-[10px] text-stone-500 tracking-[0.2em] uppercase font-medium">Prep Studio</div>
-          </div>
+          {onClose && (
+            <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-400">
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 py-4 px-2.5 overflow-y-auto space-y-0.5">
-        {nav.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 group relative ${
-                isActive
-                  ? 'bg-teal-500/10 text-teal-400 shadow-sm shadow-teal-500/5'
-                  : 'text-stone-500 hover:text-stone-200 hover:bg-stone-800/50'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-teal-400 rounded-r-full shadow-sm shadow-teal-400/50" />
-                )}
-                <Icon className={`h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200 ${
-                  isActive ? 'text-teal-400' : 'group-hover:text-stone-300'
-                }`} />
-                <span className="font-medium">{label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* Decorative line */}
-      <div className="mx-5">
-        <div className="h-px bg-gradient-to-r from-transparent via-stone-700/60 to-transparent" />
+      <div className="mx-5 mb-3">
+        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
       </div>
 
-      {/* Clock */}
+      {/* Navigation */}
+      <nav className="flex-1 py-1 px-2.5 overflow-y-auto space-y-0.5">
+        {nav.map(({ to, icon: Icon, label, color }) => {
+          const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 group relative ${
+                isActive
+                  ? 'bg-brand-500/[0.12] text-brand-300'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+              }`}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="nav-indicator"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-gradient-to-b from-indigo-400 to-violet-400 rounded-r-full"
+                  transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                />
+              )}
+              <Icon className={`h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200 ${
+                isActive ? 'text-brand-400' : color + '/50 group-hover:' + color
+              }`} />
+              <span className="font-medium">{label}</span>
+            </NavLink>
+          )
+        })}
+      </nav>
+
+      <div className="mx-5">
+        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+      </div>
+
       <Clock />
-    </aside>
+    </>
+  )
+}
+
+export function Sidebar() {
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  return (
+    <>
+      {/* Mobile hamburger */}
+      <div className="fixed top-0 left-0 right-0 h-14 glass-sidebar flex items-center px-4 lg:hidden z-50">
+        <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg hover:bg-white/[0.06] text-slate-400">
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="flex items-center gap-2 ml-3">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center">
+            <span className="text-white font-display font-bold text-xs">T</span>
+          </div>
+          <span className="font-display font-bold text-slate-100 text-sm">TOEFL Prep</span>
+        </div>
+      </div>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 lg:hidden" onClick={() => setMobileOpen(false)}>
+          <aside
+            className="w-60 h-full glass-sidebar flex flex-col shadow-glass-lg"
+            onClick={e => e.stopPropagation()}
+          >
+            <SidebarContent onClose={() => setMobileOpen(false)} />
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop sidebar */}
+      <aside className="fixed left-0 top-0 h-screen w-60 glass-sidebar flex-col z-40 hidden lg:flex">
+        <SidebarContent />
+      </aside>
+    </>
   )
 }

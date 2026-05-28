@@ -2,30 +2,10 @@
 import json
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, create_engine, SQLModel
+from sqlmodel import Session, SQLModel
 from unittest.mock import patch, AsyncMock
 
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from main import app
-from database import get_session
-
-# In-memory SQLite for tests
-TEST_DB = "sqlite:///./test_toefl.db"
-test_engine = create_engine(TEST_DB, connect_args={"check_same_thread": False})
-
-def override_session():
-    with Session(test_engine) as session:
-        yield session
-
-app.dependency_overrides[get_session] = override_session
-
-@pytest.fixture(autouse=True)
-def setup_db():
-    SQLModel.metadata.create_all(test_engine)
-    yield
-    SQLModel.metadata.drop_all(test_engine)
 
 client = TestClient(app)
 

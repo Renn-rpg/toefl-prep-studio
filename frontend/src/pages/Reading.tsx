@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { MEDIA } from '@/lib/media'
 import type { ReadingPassage, ReadingPassageDetail, Question, VocabHighlight } from '@/types'
 import { ChevronLeft, BookOpen } from 'lucide-react'
+import { PageTransition } from '@/components/motion/PageTransition'
+import { StaggerContainer } from '@/components/motion/StaggerContainer'
+import { StaggerItem } from '@/components/motion/StaggerItem'
 
 export function Reading() {
   const [passages, setPassages] = useState<ReadingPassage[]>([])
@@ -37,7 +41,7 @@ export function Reading() {
       if (match) return (
         <span key={i}>
           <button onClick={() => setActiveWord(activeWord?.word === match.word ? null : match)}
-            className="text-teal-600 border-b border-dotted border-teal-400 hover:bg-teal-50 transition-colors">
+            className="text-emerald-400 border-b border-dashed border-emerald-500/30 hover:bg-emerald-500/10 px-0.5 rounded transition-colors">
             {word}
           </button>{' '}
         </span>
@@ -47,96 +51,129 @@ export function Reading() {
   }
 
   if (!selected) return (
-    <div className="max-w-3xl space-y-6 animate-fade-up">
-      <div>
-        <h1 className="font-display text-3xl font-bold text-stone-800">阅读练习</h1>
-        <p className="text-stone-500 mt-1 text-sm">点击蓝色单词查看释义，完成后提交答案</p>
-      </div>
-      <div className="space-y-3">
-        {passages.map(p => (
-          <button key={p.id} onClick={() => selectPassage(p.id)}
-            className="w-full text-left bg-white rounded-xl border border-stone-200 p-5 hover:border-teal-400 hover:shadow-sm transition-all group">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                  <BookOpen className="h-5 w-5 text-emerald-500" />
-                </div>
-                <span className="font-semibold text-stone-800">{p.title}</span>
+    <PageTransition>
+      <div className="max-w-full lg:max-w-3xl space-y-8">
+        {/* Header with image */}
+        <div className="hero-image-overlay rounded-2xl -mx-2 overflow-hidden">
+          <img src={MEDIA.reading.header} alt="" className="absolute inset-0 w-full h-full object-cover opacity-25" />
+          <div className="relative z-[2] p-8">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                <BookOpen className="h-5 w-5 text-white" />
               </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
-                p.difficulty === 'easy' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-              }`}>{p.difficulty}</span>
+              <div>
+                <h1 className="font-display text-[1.75rem] font-bold text-slate-100 tracking-tight">阅读练习</h1>
+                <p className="text-slate-400 text-sm">点击绿色单词查看释义，完成后提交答案</p>
+              </div>
             </div>
-          </button>
-        ))}
+          </div>
+        </div>
+
+        <StaggerContainer className="space-y-3">
+          {passages.map((p) => (
+            <StaggerItem key={p.id}>
+              <button onClick={() => selectPassage(p.id)}
+                className="w-full text-left glass-card p-5 group">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 bg-emerald-500/10 rounded-xl flex items-center justify-center group-hover:bg-emerald-500/15 transition-colors">
+                      <BookOpen className="h-5 w-5 text-emerald-400" />
+                    </div>
+                    <span className="font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">{p.title}</span>
+                  </div>
+                  <span className={`text-[11px] px-2.5 py-1 rounded-full font-medium border capitalize ${
+                    p.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  }`}>{p.difficulty === 'easy' ? '简单' : '中等'}</span>
+                </div>
+              </button>
+            </StaggerItem>
+          ))}
+        </StaggerContainer>
       </div>
-    </div>
+    </PageTransition>
   )
 
   return (
-    <div className="max-w-3xl space-y-6 animate-fade-up">
-      <button onClick={() => setSelected(null)} className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700">
-        <ChevronLeft className="h-4 w-4" /> 返回列表
-      </button>
-
-      <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm">
-        <h2 className="font-display text-xl font-semibold text-stone-800 mb-4">{selected.title}</h2>
-        <p className="text-sm leading-relaxed text-stone-700">
-          {renderContent(selected.content, selected.vocab_highlights)}
-        </p>
-      </div>
-
-      {activeWord && (
-        <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start justify-between">
-          <div>
-            <span className="font-semibold text-teal-800 font-display">{activeWord.word}</span>
-            <span className="text-stone-600 text-sm ml-2">— {activeWord.definition}</span>
-          </div>
-          <button onClick={() => setActiveWord(null)} className="text-stone-400 hover:text-stone-600 ml-3">✕</button>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {selected.questions.map((q: Question) => (
-          <div key={q.id} className="bg-white rounded-xl border border-stone-200 p-5">
-            <p className="font-medium text-stone-800 mb-3">{q.question}</p>
-            <div className="space-y-2">
-              {q.options.map(opt => (
-                <label key={opt} className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${
-                  answers[String(q.id)] === opt ? 'bg-teal-50 border border-teal-200' : 'hover:bg-stone-50'
-                }`}>
-                  <input type="radio" name={`q-${q.id}`} value={opt}
-                    checked={answers[String(q.id)] === opt}
-                    onChange={() => setAnswers({ ...answers, [String(q.id)]: opt })}
-                    className="accent-teal-600" />
-                  <span className="text-sm text-stone-700">{opt}</span>
-                </label>
-              ))}
-            </div>
-            {result && (
-              <div className={`mt-3 text-xs font-medium px-3 py-1.5 rounded-lg ${
-                answers[String(q.id)] === q.answer ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-              }`}>
-                {answers[String(q.id)] === q.answer ? '✓ 正确' : `✗ 错误 — 正确答案: ${q.answer}`}
-                {q.explanation && ` · ${q.explanation}`}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {!result ? (
-        <button onClick={submit}
-          disabled={Object.keys(answers).length < selected.questions.length}
-          className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-6 py-2.5 text-sm font-medium disabled:opacity-50 transition-colors">
-          提交答案
+    <PageTransition>
+      <div className="max-w-full lg:max-w-3xl space-y-6">
+        <button onClick={() => setSelected(null)} className="flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300 transition-colors font-medium">
+          <ChevronLeft className="h-4 w-4" /> 返回列表
         </button>
-      ) : (
-        <div className="bg-white rounded-xl border border-emerald-200 p-5 text-center">
-          <div className="font-mono text-4xl font-bold text-teal-600">{result.score}<span className="text-xl text-stone-400">/{result.total_questions}</span></div>
-          <div className="text-sm text-stone-500 mt-1">答对题数</div>
+
+        <div className="glass-card-static p-6">
+          <h2 className="font-display text-xl font-semibold text-slate-100 mb-5">{selected.title}</h2>
+          <div className="text-sm leading-[1.8] text-slate-300">
+            {renderContent(selected.content, selected.vocab_highlights)}
+          </div>
         </div>
-      )}
-    </div>
+
+        {activeWord && (
+          <div className="glass-card-elevated p-4 flex items-start justify-between border-emerald-500/20">
+            <div>
+              <span className="font-semibold text-emerald-400 font-display text-lg">{activeWord.word}</span>
+              <span className="text-slate-300 text-sm ml-3">— {activeWord.definition}</span>
+            </div>
+            <button onClick={() => setActiveWord(null)} className="text-slate-500 hover:text-slate-300 ml-3 text-sm">✕</button>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {selected.questions.map((q: Question, i: number) => (
+            <div key={q.id} className="glass-card-static p-5">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-xs font-mono font-bold text-emerald-400">{i + 1}</span>
+                </div>
+                <p className="font-medium text-slate-100">{q.question}</p>
+              </div>
+              <div className="space-y-2 ml-9">
+                {q.options.map(opt => (
+                  <label key={opt} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+                    answers[String(q.id)] === opt
+                      ? 'bg-emerald-500/10 border border-emerald-500/20'
+                      : 'hover:bg-white/[0.03] border border-transparent'
+                  }`}>
+                    <input type="radio" name={`q-${q.id}`} value={opt}
+                      checked={answers[String(q.id)] === opt}
+                      onChange={() => setAnswers({ ...answers, [String(q.id)]: opt })}
+                      className="accent-emerald-500 w-4 h-4" />
+                    <span className="text-sm text-slate-300">{opt}</span>
+                  </label>
+                ))}
+              </div>
+              {result && (
+                <div className={`ml-9 mt-3 text-xs font-medium px-3 py-2 rounded-lg ${
+                  answers[String(q.id)] === q.answer
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                }`}>
+                  {answers[String(q.id)] === q.answer ? '正确' : `错误 — 正确答案: ${q.answer}`}
+                  {q.explanation && <span className="block text-slate-500 mt-0.5">{q.explanation}</span>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {!result ? (
+          <button onClick={submit}
+            disabled={Object.keys(answers).length < selected.questions.length}
+            className="btn-gradient px-6 py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed">
+            提交答案 ({Object.keys(answers).length}/{selected.questions.length})
+          </button>
+        ) : (
+          <div className="glass-card-static p-6 text-center">
+            <div className="font-mono text-5xl font-bold text-emerald-400 mb-1">
+              {result.score}<span className="text-2xl text-slate-500">/{result.total_questions}</span>
+            </div>
+            <div className="text-sm text-slate-400 font-medium">正确率 {Math.round((result.score / result.total_questions) * 100)}%</div>
+            <button onClick={() => setSelected(null)} className="mt-4 text-sm text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
+              返回列表，继续练习
+            </button>
+          </div>
+        )}
+      </div>
+    </PageTransition>
   )
 }

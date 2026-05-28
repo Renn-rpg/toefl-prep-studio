@@ -120,3 +120,49 @@ class DailyActivity(SQLModel, table=True):
     activity_date: str = Field(index=True, unique=True)
     minutes_studied: int = 0
     modules_practiced: str = "[]"
+
+
+class VocabWord(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    word: str = Field(index=True, unique=True)
+    phonetic: str = ""
+    part_of_speech: str = ""
+    definition_en: str = ""
+    definition_cn: str = ""
+    example_sentences_json: str = "[]"
+    frequency_rank: int = 0
+    tags_json: str = "[]"
+    difficulty: int = 1
+
+
+class VocabProgress(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    word_id: int = Field(foreign_key="vocabword.id", index=True)
+    status: str = "new"
+    ease_factor: float = 2.5
+    interval_days: float = 0
+    repetitions: int = 0
+    next_review_at: datetime = Field(default_factory=datetime.utcnow)
+    last_reviewed_at: Optional[datetime] = None
+    total_reviews: int = 0
+    correct_count: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class VocabStudySession(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_date: str = Field(index=True)
+    new_words_count: int = 0
+    reviewed_words_count: int = 0
+    correct_count: int = 0
+    total_count: int = 0
+    duration_seconds: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class VocabSettings(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    daily_new_words: int = 20
+    daily_review_limit: int = 100
+    auto_pronounce: bool = True
+    show_cn_definition: bool = True

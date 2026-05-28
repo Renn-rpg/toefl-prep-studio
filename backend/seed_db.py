@@ -175,6 +175,9 @@ def seed():
     print(f"  Speaking:  {len(speaking_prompts)} prompts")
     print(f"  Writing:   {len(writing_prompts)} prompts")
 
+    from seed_vocab import seed_vocab
+    seed_vocab()
+
 
 if __name__ == "__main__":
     seed()

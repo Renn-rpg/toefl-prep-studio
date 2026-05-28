@@ -1,17 +1,21 @@
 import { useState } from 'react'
 import { api } from '@/lib/api'
+import { MEDIA } from '@/lib/media'
 import type { MockTestResult } from '@/types'
 import { useTimer } from '@/hooks/useTimer'
-import { Timer, CheckCircle } from 'lucide-react'
+import { Timer, CheckCircle, FileText } from 'lucide-react'
+import { PageTransition } from '@/components/motion/PageTransition'
 
 type Phase = 'idle' | 'reading' | 'listening' | 'speaking' | 'writing' | 'complete'
 const SECTIONS: Phase[] = ['reading', 'listening', 'speaking', 'writing']
 const DURATIONS: Record<string, number> = { reading: 54 * 60, listening: 41 * 60, speaking: 17 * 60, writing: 50 * 60 }
 const SECTION_LABELS: Record<string, string> = { reading: '阅读', listening: '听力', speaking: '口语', writing: '写作' }
+const SECTION_COLORS: Record<string, string> = { reading: 'from-emerald-500 to-emerald-400', listening: 'from-cyan-500 to-cyan-400', speaking: 'from-violet-500 to-violet-400', writing: 'from-amber-500 to-amber-400' }
+const SECTION_BG: Record<string, string> = { reading: 'bg-emerald-500/[0.08] border-emerald-500/15', listening: 'bg-cyan-500/[0.08] border-cyan-500/15', speaking: 'bg-violet-500/[0.08] border-violet-500/15', writing: 'bg-amber-500/[0.08] border-amber-500/15' }
 
 function TimerDisplay({ formatted, running }: { formatted: string; running: boolean }) {
   return (
-    <div className={`flex items-center gap-2 font-mono text-lg font-bold ${running ? 'text-stone-800' : 'text-stone-400'}`}>
+    <div className={`flex items-center gap-2 font-mono text-lg font-bold tabular-nums ${running ? 'text-slate-100' : 'text-slate-500'}`}>
       <Timer className="h-5 w-5" />
       {formatted}
     </div>
@@ -48,100 +52,135 @@ export function MockTest() {
   }
 
   if (phase === 'idle') return (
-    <div className="max-w-2xl space-y-6 animate-fade-up">
-      <div>
-        <h1 className="font-display text-3xl font-bold text-stone-800">模拟考试</h1>
-        <p className="text-stone-500 mt-1 text-sm">完整 TOEFL 模拟，四节计时测试</p>
-      </div>
-      <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm space-y-5">
-        <div className="space-y-3">
-          {[['阅读 Reading', '54 分钟', 'bg-teal-50 text-teal-600'],
-            ['听力 Listening', '41 分钟', 'bg-emerald-50 text-emerald-600'],
-            ['口语 Speaking', '17 分钟', 'bg-violet-50 text-violet-600'],
-            ['写作 Writing', '50 分钟', 'bg-amber-50 text-amber-600'],
-          ].map(([label, time, color]) => (
-            <div key={label} className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0">
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-8 rounded-full ${color.split(' ')[0]}`} />
-                <span className="font-medium text-stone-700">{label}</span>
+    <PageTransition>
+      <div className="max-w-full lg:max-w-2xl space-y-8">
+        {/* Hero with image */}
+        <div className="hero-image-overlay rounded-2xl -mx-2 overflow-hidden">
+          <img src={MEDIA.mock.hero} alt="" className="absolute inset-0 w-full h-full object-cover opacity-25" />
+          <div className="relative z-[2] p-8">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-500 to-rose-400 flex items-center justify-center shadow-lg shadow-red-500/25">
+                <FileText className="h-5 w-5 text-white" />
               </div>
-              <span className="font-mono text-sm text-stone-500">{time}</span>
+              <div>
+                <h1 className="font-display text-[1.75rem] font-bold text-slate-100 tracking-tight">模拟考试</h1>
+                <p className="text-slate-400 text-sm">完整 TOEFL 模拟，四节计时测试</p>
+              </div>
             </div>
-          ))}
+          </div>
         </div>
-        <div className="pt-2 flex items-center justify-between text-sm text-stone-400 border-t border-stone-100">
-          <span>总时长约 162 分钟</span>
-          <span>可随时提交进入下一节</span>
+
+        <div className="glass-card-static p-6 space-y-5">
+          <div className="space-y-1">
+            {[
+              { label: '阅读 Reading', time: '54 分钟', color: 'bg-emerald-500' },
+              { label: '听力 Listening', time: '41 分钟', color: 'bg-cyan-500' },
+              { label: '口语 Speaking', time: '17 分钟', color: 'bg-violet-500' },
+              { label: '写作 Writing', time: '50 分钟', color: 'bg-amber-500' },
+            ].map(({ label, time, color }) => (
+              <div key={label} className="flex items-center justify-between py-3 border-b border-white/[0.06] last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className={`w-2 h-8 rounded-full ${color}`} />
+                  <span className="font-medium text-slate-200 text-sm">{label}</span>
+                </div>
+                <span className="font-mono text-sm text-slate-400">{time}</span>
+              </div>
+            ))}
+          </div>
+          <div className="pt-2 flex items-center justify-between text-sm text-slate-500 border-t border-white/[0.06]">
+            <span>总时长约 162 分钟</span>
+            <span>可随时提交进入下一节</span>
+          </div>
+          <button onClick={startTest} className="w-full btn-gradient py-3.5 text-sm font-semibold">
+            开始模拟考试
+          </button>
         </div>
-        <button onClick={startTest} className="w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl py-3 font-medium transition-colors">
-          开始模拟考试
-        </button>
       </div>
-    </div>
+    </PageTransition>
   )
 
   if (phase === 'complete' && result) return (
-    <div className="max-w-2xl space-y-6 animate-fade-up">
-      <div className="flex items-center gap-3">
-        <CheckCircle className="h-8 w-8 text-emerald-500" />
-        <h1 className="font-display text-3xl font-bold text-stone-800">考试完成</h1>
-      </div>
-      <div className="bg-white rounded-2xl border border-stone-200 p-8 shadow-sm text-center">
-        <div className="font-mono text-6xl font-bold text-teal-600 mb-1">{result.total_score ?? '--'}</div>
-        <div className="text-stone-400 text-sm mb-8">总分 / 120</div>
-        <div className="grid grid-cols-2 gap-4">
-          {(['reading', 'listening', 'speaking', 'writing'] as const).map(s => (
-            <div key={s} className="bg-stone-50 rounded-xl p-4">
-              <div className="font-mono text-2xl font-bold text-stone-800">{result[`${s}_score` as keyof MockTestResult] ?? '--'}</div>
-              <div className="text-xs text-stone-400 mt-1 capitalize">{SECTION_LABELS[s]} / 30</div>
-            </div>
-          ))}
+    <PageTransition>
+      <div className="max-w-full lg:max-w-2xl space-y-8">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+            <CheckCircle className="h-5 w-5 text-white" />
+          </div>
+          <h1 className="font-display text-[1.75rem] font-bold text-slate-100">考试完成</h1>
         </div>
-        <button onClick={() => { setPhase('idle'); setResult(null); setMockId(null) }}
-          className="mt-6 border border-stone-200 rounded-xl px-5 py-2 text-sm hover:bg-stone-50 transition-colors">
-          再来一次
-        </button>
+
+        <div className="glass-card-static p-8 text-center">
+          <div className="font-mono text-7xl font-bold mb-2">
+            <span className="text-gradient-brand">{result.total_score ?? '--'}</span>
+          </div>
+          <div className="text-slate-500 text-sm mb-8 font-medium">总分 / 120</div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {(['reading', 'listening', 'speaking', 'writing'] as const).map(s => (
+              <div key={s} className={`rounded-xl p-4 border ${SECTION_BG[s]}`}>
+                <div className="font-mono text-2xl font-bold text-slate-100">{result[`${s}_score` as keyof MockTestResult] ?? '--'}</div>
+                <div className="text-xs text-slate-400 mt-1 font-medium">{SECTION_LABELS[s]} / 30</div>
+              </div>
+            ))}
+          </div>
+
+          <button onClick={() => { setPhase('idle'); setResult(null); setMockId(null) }}
+            className="mt-8 btn-gradient px-6 py-3 text-sm font-semibold">
+            再来一次
+          </button>
+        </div>
       </div>
-    </div>
+    </PageTransition>
   )
 
   const sectionIdx = SECTIONS.indexOf(phase)
 
   return (
-    <div className="max-w-2xl space-y-6 animate-fade-up">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl font-bold text-stone-800">
-          {SECTION_LABELS[phase]} 部分
-        </h1>
-        <div className="flex items-center gap-4">
-          <TimerDisplay formatted={timer.formatted} running={timer.running} />
-          <button onClick={nextSection} className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-4 py-2 text-sm font-medium transition-colors">
-            {sectionIdx < SECTIONS.length - 1 ? '下一节 →' : '提交完成'}
-          </button>
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="flex gap-2">
-        {SECTIONS.map((s, i) => (
-          <div key={s} className="flex-1">
-            <div className={`h-1.5 rounded-full transition-all ${i < sectionIdx ? 'bg-teal-500' : i === sectionIdx ? 'bg-teal-300' : 'bg-stone-200'}`} />
-            <div className="text-[10px] text-stone-400 mt-1 text-center">{SECTION_LABELS[s]}</div>
+    <PageTransition>
+      <div className="max-w-full lg:max-w-2xl space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-2xl font-bold text-slate-100">
+            {SECTION_LABELS[phase]} 部分
+          </h1>
+          <div className="flex items-center gap-4">
+            <TimerDisplay formatted={timer.formatted} running={timer.running} />
+            <button onClick={nextSection} className="btn-gradient px-5 py-2.5 text-sm font-semibold">
+              {sectionIdx < SECTIONS.length - 1 ? '下一节 →' : '提交完成'}
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
 
-      <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm">
-        <p className="text-sm text-stone-500 mb-4">
-          {phase === 'reading' && '阅读文章并回答题目。实际考试中，请专注阅读考卷内容。'}
-          {phase === 'listening' && '听取音频材料并回答题目。实际考试中，请认真听取音频。'}
-          {phase === 'speaking' && '完成口语任务。实际考试中，请在规定时间内录音作答。'}
-          {phase === 'writing' && '完成写作任务。实际考试中，请在时间内完成作文。'}
-        </p>
-        <div className="bg-stone-50 rounded-xl p-5 border border-dashed border-stone-200 text-center text-stone-400 text-sm">
-          实际考试内容区域 — 请结合配套练习材料使用
+        <div className="flex gap-2">
+          {SECTIONS.map((s, i) => (
+            <div key={s} className="flex-1">
+              <div className={`h-1.5 rounded-full transition-all ${
+                i < sectionIdx
+                  ? `bg-gradient-to-r ${SECTION_COLORS[s]}`
+                  : i === sectionIdx
+                  ? 'bg-indigo-400 animate-pulse'
+                  : 'bg-white/[0.06]'
+              }`} />
+              <div className="text-[10px] text-slate-500 mt-1 text-center font-medium">{SECTION_LABELS[s]}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="glass-card-static p-6">
+          <p className="text-sm text-slate-400 mb-5">
+            {phase === 'reading' && '阅读文章并回答题目。请专注阅读考卷内容。'}
+            {phase === 'listening' && '听取音频材料并回答题目。请认真听取音频。'}
+            {phase === 'speaking' && '完成口语任务。请在规定时间内录音作答。'}
+            {phase === 'writing' && '完成写作任务。请在规定时间内完成作文。'}
+          </p>
+          <div className="bg-white/[0.03] rounded-xl p-8 border border-dashed border-white/[0.08] text-center">
+            <div className="w-12 h-12 rounded-xl bg-white/[0.04] flex items-center justify-center mx-auto mb-3">
+              <FileText className="h-5 w-5 text-slate-500" />
+            </div>
+            <p className="text-slate-400 text-sm">实际考试内容区域</p>
+            <p className="text-slate-500 text-xs mt-1">请结合配套练习材料使用</p>
+          </div>
         </div>
       </div>
-    </div>
+    </PageTransition>
   )
 }

@@ -130,3 +130,45 @@ export interface DashboardData {
   radar: { reading: number; listening: number; speaking: number; writing: number }
   heatmap: { date: string; minutes: number }[]
 }
+
+export interface VocabExampleSentence {
+  en: string
+  cn: string
+}
+
+export interface VocabCard {
+  word_id: number
+  word: string
+  phonetic: string
+  part_of_speech: string
+  definition_en: string
+  definition_cn: string
+  example_sentences: VocabExampleSentence[]
+  status: string
+  repetitions: number
+}
+
+export interface VocabStats {
+  today: {
+    new_words: number
+    reviewed_words: number
+    accuracy: number
+    minutes_studied: number
+  }
+  all_time: {
+    total_words: number
+    mastered: number
+    reviewing: number
+    learning: number
+    new: number
+  }
+  streak_days: number
+  words_due_today: number
+}
+
+export interface VocabSettings {
+  daily_new_words: number
+  daily_review_limit: number
+  auto_pronounce: boolean
+  show_cn_definition: boolean
+}
