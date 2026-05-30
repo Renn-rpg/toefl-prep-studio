@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
 import type { StageEval } from '@/types'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Plus, BarChart3 } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
-import { RevealSection } from '@/components/motion/RevealSection'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+
+gsap.registerPlugin(ScrollTrigger)
 
 export function Evaluation() {
   const [history, setHistory] = useState<StageEval[]>([])
@@ -14,6 +17,11 @@ export function Evaluation() {
     reading_score: 0, listening_score: 0, speaking_score: 0, writing_score: 0, notes: ''
   })
   const [saving, setSaving] = useState(false)
+
+  // GSAP refs
+  const chartRef = useRef<HTMLDivElement>(null)
+  const historyContainerRef = useRef<HTMLDivElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => { api.get<StageEval[]>('/evaluation/history').then(setHistory) }, [])
 
@@ -32,6 +40,50 @@ export function Evaluation() {
     总分: e.total_score, 听力: e.listening_score, 阅读: e.reading_score,
     口语: e.speaking_score, 写作: e.writing_score,
   }))
+
+  // GSAP: ScrollTrigger for chart area (replace RevealSection)
+  useEffect(() => {
+    if (!chartRef.current) return
+    const st = ScrollTrigger.create({
+      trigger: chartRef.current,
+      start: 'top 85%',
+      onEnter: () => {
+        gsap.fromTo(chartRef.current, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' })
+      },
+      once: true,
+    })
+    return () => st.kill()
+  }, [trendData.length])
+
+  // GSAP: stagger entrance for history list items
+  useEffect(() => {
+    if (!historyContainerRef.current || history.length === 0) return
+    const ctx = gsap.context(() => {
+      gsap.from(historyContainerRef.current!.children, {
+        opacity: 0,
+        y: 24,
+        duration: 0.5,
+        stagger: 0.08,
+        ease: 'power3.out',
+      })
+    }, historyContainerRef)
+    return () => ctx.revert()
+  }, [history])
+
+  // GSAP: stagger from() for form fields
+  useEffect(() => {
+    if (!formRef.current) return
+    const ctx = gsap.context(() => {
+      gsap.from(formRef.current!.querySelectorAll('.form-field'), {
+        opacity: 0,
+        y: 16,
+        duration: 0.4,
+        stagger: 0.06,
+        ease: 'power2.out',
+      })
+    }, formRef)
+    return () => ctx.revert()
+  }, [])
 
   return (
     <PageTransition>
@@ -60,8 +112,8 @@ export function Evaluation() {
             </div>
             录入成绩
           </h2>
-          <form onSubmit={save} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+          <form ref={formRef} onSubmit={save} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-field">
               <label className="block text-xs font-medium text-slate-400 mb-1.5">评估类型</label>
               <select className="w-full input-dark px-3 py-2.5 text-sm"
                 value={form.stage_type} onChange={e => setForm({ ...form, stage_type: e.target.value })}>
@@ -70,14 +122,14 @@ export function Evaluation() {
               </select>
             </div>
             {form.stage_type === 'weekly' && (
-              <div>
+              <div className="form-field">
                 <label className="block text-xs font-medium text-slate-400 mb-1.5">第几周</label>
                 <input type="number" min={1} className="w-full input-dark px-3 py-2.5 text-sm"
                   value={form.week_number} onChange={e => setForm({ ...form, week_number: Number(e.target.value) })} />
               </div>
             )}
             {(['listening', 'reading', 'speaking', 'writing'] as const).map(s => (
-              <div key={s}>
+              <div key={s} className="form-field">
                 <label className="block text-xs font-medium text-slate-400 mb-1.5 capitalize">
                   {s === 'listening' ? '听力' : s === 'reading' ? '阅读' : s === 'speaking' ? '口语' : '写作'} (0-30)
                 </label>
@@ -87,12 +139,12 @@ export function Evaluation() {
                   onChange={e => setForm({ ...form, [`${s}_score`]: Number(e.target.value) })} />
               </div>
             ))}
-            <div className="col-span-1 md:col-span-2">
+            <div className="col-span-1 md:col-span-2 form-field">
               <label className="block text-xs font-medium text-slate-400 mb-1.5">备注</label>
               <input type="text" className="w-full input-dark px-3 py-2.5 text-sm"
                 value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="本次测试的感受..." />
             </div>
-            <div className="col-span-1 md:col-span-2">
+            <div className="col-span-1 md:col-span-2 form-field">
               <button type="submit" disabled={saving}
                 className="btn-gradient px-6 py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed">
                 {saving ? '保存中...' : '保存成绩'}
@@ -103,7 +155,7 @@ export function Evaluation() {
 
         {/* Trend chart */}
         {trendData.length > 0 && (
-          <RevealSection><div className="glass-card-static p-6 relative overflow-visible">
+          <div ref={chartRef} className="glass-card-static p-6 relative overflow-visible">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-teal-500 to-teal-300" />
               <h2 className="font-display text-lg font-semibold text-slate-100">成绩趋势</h2>
@@ -130,7 +182,7 @@ export function Evaluation() {
                 <Line type="monotone" dataKey="写作" stroke="#F59E0B" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
               </LineChart>
             </ResponsiveContainer>
-          </div></RevealSection>
+          </div>
         )}
 
         {/* History list */}
@@ -140,33 +192,35 @@ export function Evaluation() {
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-teal-500 to-teal-300" />
               <h2 className="font-display text-lg font-semibold text-slate-100">评测历史</h2>
             </div>
-            {history.map(e => (
-              <div key={e.id} className="glass-card-static p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-semibold text-slate-100 text-sm">
-                    {e.stage_type === 'weekly' ? `第 ${e.week_number} 周测试` : '月度测试'}
-                  </span>
-                  <span className="text-xs text-slate-500 font-mono">{e.created_at.split('T')[0]}</span>
-                </div>
-                <div className="flex items-center gap-6">
-                  {(['listening', 'reading', 'speaking', 'writing'] as const).map(s => (
-                    <div key={s} className="text-center">
-                      <div className="font-mono font-bold text-lg text-slate-200">
-                        {e[`${s}_score` as keyof StageEval]}
-                      </div>
-                      <div className="text-[10px] text-slate-500 font-medium">
-                        {s === 'listening' ? '听' : s === 'reading' ? '读' : s === 'speaking' ? '说' : '写'}
-                      </div>
-                    </div>
-                  ))}
-                  <div className="ml-auto text-center">
-                    <div className="font-mono font-bold text-2xl text-brand-400">{e.total_score}</div>
-                    <div className="text-[10px] text-slate-500 font-medium">总分</div>
+            <div ref={historyContainerRef} className="space-y-3">
+              {history.map(e => (
+                <div key={e.id} className="glass-card-static p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-semibold text-slate-100 text-sm">
+                      {e.stage_type === 'weekly' ? `第 ${e.week_number} 周测试` : '月度测试'}
+                    </span>
+                    <span className="text-xs text-slate-500 font-mono">{e.created_at.split('T')[0]}</span>
                   </div>
+                  <div className="flex items-center gap-6">
+                    {(['listening', 'reading', 'speaking', 'writing'] as const).map(s => (
+                      <div key={s} className="text-center">
+                        <div className="font-mono font-bold text-lg text-slate-200">
+                          {e[`${s}_score` as keyof StageEval]}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium">
+                          {s === 'listening' ? '听' : s === 'reading' ? '读' : s === 'speaking' ? '说' : '写'}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="ml-auto text-center">
+                      <div className="font-mono font-bold text-2xl text-brand-400">{e.total_score}</div>
+                      <div className="text-[10px] text-slate-500 font-medium">总分</div>
+                    </div>
+                  </div>
+                  {e.notes && <p className="mt-2 text-xs text-slate-500 italic">"{e.notes}"</p>}
                 </div>
-                {e.notes && <p className="mt-2 text-xs text-slate-500 italic">"{e.notes}"</p>}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>

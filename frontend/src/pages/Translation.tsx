@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import { useSoundEffects } from '@/hooks/useSoundEffects'
+import { useGsapShake, useGsapCounter } from '@/hooks/useGsap'
 import type { TranslationSet } from '@/types'
 import { ChevronLeft, Sparkles, ArrowLeftRight, Check, X, Zap, Trophy, RotateCcw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PageTransition } from '@/components/motion/PageTransition'
-import { motion, AnimatePresence } from 'motion/react'
+import gsap from 'gsap'
 
 type Phase = 'config' | 'active' | 'feedback' | 'finished'
 type Mode = 'cn_to_en' | 'en_to_cn'
@@ -78,7 +79,12 @@ export function Translation() {
   const [sentenceResult, setSentenceResult] = useState<CheckResult | null>(null)
   const [allResults, setAllResults] = useState<CheckResult[]>([])
   const [loading, setLoading] = useState(false)
-  const [shakeKey, setShakeKey] = useState(0)
+
+  // GSAP hooks
+  const { ref: shakeRef, shake } = useGsapShake<HTMLDivElement>()
+  const sentenceContentRef = useRef<HTMLDivElement>(null)
+  const feedbackRef = useRef<HTMLDivElement>(null)
+  const trophyRef = useRef<HTMLDivElement>(null)
 
   async function generate() {
     setLoading(true)
@@ -102,9 +108,73 @@ export function Translation() {
   }
 
   const sentence = data?.sentences[currentIdx]
-  const allBlanks = data?.sentences.reduce((sum, s) => sum + (s.blanks?.length ?? 0), 0) ?? 0
   const currentBlanks = sentence?.blanks?.length ?? 0
   const filledCurrent = sentence?.blanks?.filter(b => answers[answerKey(currentIdx, b.position)]?.trim()).length ?? 0
+
+  // GSAP timeline 句子过渡 — 替代 AnimatePresence
+  // 过渡辅助：先滑出旧句子，再更新状态，新句子自动滑入
+  const transitionAndUpdate = useCallback((updateFn: () => void) => {
+    const el = sentenceContentRef.current
+    if (!el) { updateFn(); return }
+    gsap.to(el, {
+      opacity: 0,
+      y: -12,
+      duration: 0.15,
+      ease: 'power2.in',
+      onComplete: () => {
+        updateFn()
+      },
+    })
+  }, [])
+
+  // GSAP 入场动画 — 句子内容挂载后从下方滑入
+  useEffect(() => {
+    const el = sentenceContentRef.current
+    if (!el) return
+    const ctx = gsap.context(() => {
+      gsap.from(el, {
+        opacity: 0,
+        y: 16,
+        duration: 0.35,
+        ease: 'power3.out',
+        delay: 0.05,
+      })
+    })
+    return () => ctx.revert()
+  }, [currentIdx])
+
+  // GSAP 反馈入场动画 — correct/incorrect 反馈条
+  useEffect(() => {
+    if (phase !== 'feedback') return
+    const el = feedbackRef.current
+    if (!el) return
+    const ctx = gsap.context(() => {
+      gsap.from(el, {
+        opacity: 0,
+        scale: 0.9,
+        duration: 0.4,
+        ease: 'back.out(1.5)',
+      })
+    })
+    return () => ctx.revert()
+  }, [phase])
+
+  // GSAP 奖杯入场动画 — finished screen
+  useEffect(() => {
+    if (phase !== 'finished') return
+    const el = trophyRef.current
+    if (!el) return
+    const ctx = gsap.context(() => {
+      gsap.from(el, {
+        scale: 0,
+        opacity: 0,
+        duration: 0.8,
+        ease: 'elastic.out(1, 0.5)',
+        delay: 0.2,
+      })
+    })
+    return () => ctx.revert()
+  }, [phase])
 
   async function checkCurrent() {
     if (!data || !sentence) return
@@ -120,12 +190,12 @@ export function Translation() {
     setAllResults(prev => [...prev, res])
     setPhase('feedback')
 
-    // Feedback
     const allCorrect = res.results[0]?.blanks.every(b => b.is_correct)
     if (allCorrect) {
       sfx.playCorrect()
     } else {
-      setShakeKey(k => k + 1)
+      // GSAP shake — 替换 motion.div 抖动
+      shake(8, 0.5)
       if (navigator.vibrate) navigator.vibrate([80, 60, 80])
     }
   }
@@ -133,11 +203,15 @@ export function Translation() {
   function nextSentence() {
     if (!data) return
     if (currentIdx + 1 < data.sentences.length) {
-      setCurrentIdx(i => i + 1)
-      setSentenceResult(null)
-      setPhase('active')
+      transitionAndUpdate(() => {
+        setCurrentIdx(i => i + 1)
+        setSentenceResult(null)
+        setPhase('active')
+      })
     } else {
-      setPhase('finished')
+      transitionAndUpdate(() => {
+        setPhase('finished')
+      })
     }
   }
 
@@ -278,44 +352,10 @@ export function Translation() {
     const pct = total > 0 ? Math.round((score / total) * 100) : 0
     return (
       <PageTransition>
-        <div className="max-w-lg mx-auto text-center py-12">
-          <div className="w-28 h-28 rounded-3xl overflow-hidden mx-auto mb-6 relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Trophy className="h-12 w-12 text-blue-400 drop-shadow-lg" />
-            </div>
-          </div>
-          <h2 className="font-display text-2xl font-bold text-slate-100 mb-1">练习完成</h2>
-          <p className="text-slate-400 text-sm mb-8">
-            {pct >= 80 ? '太棒了！' : pct >= 60 ? '还不错，继续加油' : '多练习会更好'}
-          </p>
-
-          <div className="glass-card-static p-6 mb-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <div className="font-mono text-3xl font-bold text-blue-400">
-                  {score}<span className="text-lg text-slate-500">/{total}</span>
-                </div>
-                <div className="text-xs text-slate-500 mt-1 font-medium">正确</div>
-              </div>
-              <div className="text-center">
-                <div className="font-mono text-3xl font-bold text-emerald-400">{pct}%</div>
-                <div className="text-xs text-slate-500 mt-1 font-medium">正确率</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-3 justify-center">
-            <button onClick={generate}
-              className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-sm font-semibold">
-              <RotateCcw className="h-4 w-4" /> 再来一轮
-            </button>
-            <button onClick={() => { setPhase('config'); setData(null) }}
-              className="px-6 py-3 rounded-xl text-sm font-medium border border-white/[0.08] text-slate-300 hover:bg-white/[0.04] transition-colors">
-              返回设置
-            </button>
-          </div>
-        </div>
+        <FinishedScreen score={score} total={total} pct={pct} trophyRef={trophyRef}
+          onRestart={generate}
+          onBackToSettings={() => { setPhase('config'); setData(null) }}
+        />
       </PageTransition>
     )
   }
@@ -352,89 +392,142 @@ export function Translation() {
             style={{ width: `${((currentIdx + (phase === 'feedback' ? 1 : 0)) / (data?.sentences.length ?? 1)) * 100}%` }} />
         </div>
 
-        <AnimatePresence mode="wait">
-          <motion.div key={currentIdx}
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.25 }}
-          >
-            {/* Source sentence */}
-            <div className="glass-card-static p-5 mb-4">
-              <p className="text-[10px] tracking-wider text-slate-500 font-semibold mb-2 uppercase">
-                {mode === 'cn_to_en' ? '中文' : '英文'}
-              </p>
-              <p className="text-sm text-slate-300 leading-relaxed">{sourceText}</p>
+        {/* 句子内容 — 使用 key 触发 GSAP 过渡 */}
+        <div key={currentIdx} ref={sentenceContentRef}>
+          {/* Source sentence */}
+          <div className="glass-card-static p-5 mb-4">
+            <p className="text-[10px] tracking-wider text-slate-500 font-semibold mb-2 uppercase">
+              {mode === 'cn_to_en' ? '中文' : '英文'}
+            </p>
+            <p className="text-sm text-slate-300 leading-relaxed">{sourceText}</p>
+          </div>
+
+          {/* Target with blanks — GSAP shake on incorrect (替代 motion.div) */}
+          <div ref={shakeRef} className="glass-card-static p-6 mb-4">
+            <p className="text-[10px] tracking-wider text-slate-500 font-semibold mb-4 uppercase">
+              {mode === 'cn_to_en' ? '填入英文' : '填入中文'}
+            </p>
+
+            <p className="text-base leading-relaxed text-slate-200">
+              {renderTargetWithUnderlines(
+                targetText, sortedBlanks, currentIdx, answers,
+                setAnswers, sentenceResult, phase, answerKey,
+              )}
+            </p>
+
+            {/* Hints */}
+            <div className="flex flex-wrap gap-2 mt-5 pt-4 border-t border-white/[0.06]">
+              {sortedBlanks.map((b, bi) => (
+                <span key={bi} className="bg-white/[0.04] px-2 py-1 rounded-lg border border-white/[0.06] text-[11px] text-slate-500">
+                  提示{currentBlanks > 1 ? `${bi + 1}` : ''}：{b.hint}
+                </span>
+              ))}
             </div>
+          </div>
 
-            {/* Target with blanks */}
-            <motion.div
-              animate={phase === 'feedback' && !allCorrect ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : {}}
-              transition={{ duration: 0.5 }}
-              key={shakeKey}
-              className="glass-card-static p-6 mb-4"
+          {/* Feedback — GSAP scale bounce for correct, border flash handled by CSS + GSAP entrance */}
+          {phase === 'feedback' && sentenceResult && (
+            <div
+              ref={feedbackRef}
+              className={`p-4 rounded-xl border text-sm text-center font-semibold mb-4 ${
+                allCorrect
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+              }`}
             >
-              <p className="text-[10px] tracking-wider text-slate-500 font-semibold mb-4 uppercase">
-                {mode === 'cn_to_en' ? '填入英文' : '填入中文'}
-              </p>
+              {allCorrect ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Check className="h-4 w-4" /> 正确！
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <X className="h-4 w-4" /> 有错误，查看正确答案
+                </span>
+              )}
+            </div>
+          )}
 
-              <p className="text-base leading-relaxed text-slate-200">
-                {renderTargetWithUnderlines(
-                  targetText, sortedBlanks, currentIdx, answers,
-                  setAnswers, sentenceResult, phase, answerKey,
-                )}
-              </p>
-
-              {/* Hints */}
-              <div className="flex flex-wrap gap-2 mt-5 pt-4 border-t border-white/[0.06]">
-                {sortedBlanks.map((b, bi) => (
-                  <span key={bi} className="bg-white/[0.04] px-2 py-1 rounded-lg border border-white/[0.06] text-[11px] text-slate-500">
-                    提示{currentBlanks > 1 ? `${bi + 1}` : ''}：{b.hint}
-                  </span>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Feedback */}
-            {phase === 'feedback' && sentenceResult && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`p-4 rounded-xl border text-sm text-center font-semibold mb-4 ${
-                  allCorrect
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                }`}
-              >
-                {allCorrect ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Check className="h-4 w-4" /> 正确！
-                  </span>
-                ) : (
-                  <span className="flex items-center justify-center gap-2">
-                    <X className="h-4 w-4" /> 有错误，查看正确答案
-                  </span>
-                )}
-              </motion.div>
-            )}
-
-            {/* Actions */}
-            {phase === 'active' ? (
-              <button
-                onClick={checkCurrent}
-                disabled={filledCurrent < currentBlanks}
-                className="btn-gradient w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-                <Zap className="h-4 w-4" />
-                确认 ({filledCurrent}/{currentBlanks})
-              </button>
-            ) : (
-              <button onClick={nextSentence}
-                className="btn-gradient w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
-                {currentIdx + 1 < (data?.sentences.length ?? 0) ? '下一题' : '查看结果'}
-              </button>
-            )}
-          </motion.div>
-        </AnimatePresence>
+          {/* Actions */}
+          {phase === 'active' ? (
+            <button
+              onClick={checkCurrent}
+              disabled={filledCurrent < currentBlanks}
+              className="btn-gradient w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+              <Zap className="h-4 w-4" />
+              确认 ({filledCurrent}/{currentBlanks})
+            </button>
+          ) : (
+            <button onClick={nextSentence}
+              className="btn-gradient w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+              {currentIdx + 1 < (data?.sentences.length ?? 0) ? '下一题' : '查看结果'}
+            </button>
+          )}
+        </div>
       </div>
     </PageTransition>
+  )
+}
+
+// ═══════════════════════════════════════
+// FinishedScreen — GSAP 增强完成界面
+// ═══════════════════════════════════════
+function FinishedScreen({
+  score, total, pct, trophyRef,
+  onRestart, onBackToSettings,
+}: {
+  score: number
+  total: number
+  pct: number
+  trophyRef: React.RefObject<HTMLDivElement | null>
+  onRestart: () => void
+  onBackToSettings: () => void
+}) {
+  // useGsapCounter for score number animation
+  const { ref: scoreRef } = useGsapCounter<HTMLSpanElement>(score, { duration: 1.2, delay: 0.5 })
+  const { ref: pctRef } = useGsapCounter<HTMLSpanElement>(pct, { duration: 1.0, delay: 0.6 })
+
+  return (
+    <div className="max-w-lg mx-auto text-center py-12">
+      {/* Trophy icon — GSAP elastic scale bounce entrance */}
+      <div ref={trophyRef} className="w-28 h-28 rounded-3xl overflow-hidden mx-auto mb-6 relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Trophy className="h-12 w-12 text-blue-400 drop-shadow-lg" />
+        </div>
+      </div>
+      <h2 className="font-display text-2xl font-bold text-slate-100 mb-1">练习完成</h2>
+      <p className="text-slate-400 text-sm mb-8">
+        {pct >= 80 ? '太棒了！' : pct >= 60 ? '还不错，继续加油' : '多练习会更好'}
+      </p>
+
+      <div className="glass-card-static p-6 mb-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-center">
+            <div className="font-mono text-3xl font-bold text-blue-400">
+              <span ref={scoreRef}>0</span><span className="text-lg text-slate-500">/{total}</span>
+            </div>
+            <div className="text-xs text-slate-500 mt-1 font-medium">正确</div>
+          </div>
+          <div className="text-center">
+            <div className="font-mono text-3xl font-bold text-emerald-400">
+              <span ref={pctRef}>0</span>%
+            </div>
+            <div className="text-xs text-slate-500 mt-1 font-medium">正确率</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-3 justify-center">
+        <button onClick={onRestart}
+          className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-sm font-semibold">
+          <RotateCcw className="h-4 w-4" /> 再来一轮
+        </button>
+        <button onClick={onBackToSettings}
+          className="px-6 py-3 rounded-xl text-sm font-medium border border-white/[0.08] text-slate-300 hover:bg-white/[0.04] transition-colors">
+          返回设置
+        </button>
+      </div>
+    </div>
   )
 }
 

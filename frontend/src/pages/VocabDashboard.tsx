@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
 import type { VocabStats, VocabSettings } from '@/types'
 import { BookA, Flame, Target, Clock, Zap, Settings, ChevronRight, FileSearch, Star, Brain, Volume2 } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
-import { StaggerContainer } from '@/components/motion/StaggerContainer'
-import { StaggerItem } from '@/components/motion/StaggerItem'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { useGsapCounter } from '@/hooks/useGsap'
+
+gsap.registerPlugin(ScrollTrigger)
 
 function StatCard({ icon: Icon, label, value, color }: {
   icon: React.ElementType; label: string; value: string | number; color: 'pink' | 'violet' | 'amber' | 'cyan'
@@ -18,6 +21,8 @@ function StatCard({ icon: Icon, label, value, color }: {
     cyan:   { iconBg: 'bg-gradient-to-br from-cyan-500 to-cyan-400', accent: 'from-cyan-400 to-cyan-300' },
   }
   const p = palettes[color]
+  const numValue = typeof value === 'number' ? value : Number(value)
+  const counter = useGsapCounter(Number.isNaN(numValue) ? 0 : numValue)
 
   return (
     <div className="card-glow relative overflow-hidden p-5 group">
@@ -26,7 +31,9 @@ function StatCard({ icon: Icon, label, value, color }: {
         <div className={`inline-flex p-2.5 rounded-xl mb-3 ${p.iconBg} shadow-lg`}>
           <Icon className="h-5 w-5 text-white" />
         </div>
-        <div className="font-mono text-[2rem] font-bold text-slate-100 leading-none">{value}</div>
+        <div className="font-mono text-[2rem] font-bold text-slate-100 leading-none">
+          <span ref={counter.ref}>0</span>
+        </div>
         <div className="text-[13px] text-slate-400 mt-1.5 font-medium">{label}</div>
       </div>
     </div>
@@ -35,6 +42,17 @@ function StatCard({ icon: Icon, label, value, color }: {
 
 function StatusBar({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
   const pct = total > 0 ? (count / total) * 100 : 0
+  const barRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (barRef.current) {
+      gsap.fromTo(barRef.current,
+        { width: '0%' },
+        { width: `${Math.max(pct, 4)}%`, duration: 1.2, ease: 'power3.out', delay: 0.3 }
+      )
+    }
+  }, [pct])
+
   return (
     <div>
       <div className="flex justify-between text-sm mb-1.5">
@@ -42,8 +60,7 @@ function StatusBar({ label, count, total, color }: { label: string; count: numbe
         <span className="font-mono text-slate-400 text-xs">{count}</span>
       </div>
       <div className="h-2.5 bg-white/[0.06] rounded-full overflow-hidden">
-        <div className={`h-full ${color} rounded-full transition-all duration-1000 ease-out`}
-          style={{ width: `${Math.max(pct, 4)}%` }} />
+        <div ref={barRef} className={`h-full ${color} rounded-full`} style={{ width: '0%' }} />
       </div>
     </div>
   )
@@ -55,6 +72,11 @@ export function VocabDashboard() {
   const [settings, setSettings] = useState<VocabSettings | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [bookmarkCount, setBookmarkCount] = useState(0)
+
+  // GSAP refs
+  const statCardsRef = useRef<HTMLDivElement>(null)
+  const quickActionsRef = useRef<HTMLDivElement>(null)
+  const settingsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     api.get<VocabStats>('/vocab/stats').then(setStats).catch(() => {})
@@ -68,6 +90,49 @@ export function VocabDashboard() {
     setSettings(updated)
     await api.put('/vocab/settings', updated).catch(() => {})
   }
+
+  // GSAP: stagger entrance for stat cards
+  useEffect(() => {
+    if (!statCardsRef.current || !stats) return
+    const ctx = gsap.context(() => {
+      gsap.from(statCardsRef.current!.children, {
+        opacity: 0,
+        y: 24,
+        duration: 0.5,
+        stagger: 0.1,
+        ease: 'power3.out',
+      })
+    }, statCardsRef)
+    return () => ctx.revert()
+  }, [stats])
+
+  // GSAP: stagger entrance for quick action buttons
+  useEffect(() => {
+    if (!quickActionsRef.current) return
+    const ctx = gsap.context(() => {
+      gsap.from(quickActionsRef.current!.children, {
+        opacity: 0,
+        y: 20,
+        duration: 0.4,
+        stagger: 0.1,
+        ease: 'power3.out',
+        delay: 0.2,
+      })
+    }, quickActionsRef)
+    return () => ctx.revert()
+  }, [])
+
+  // GSAP: slide down for settings panel
+  useEffect(() => {
+    if (showSettings && settingsRef.current) {
+      gsap.from(settingsRef.current, {
+        opacity: 0,
+        y: -24,
+        duration: 0.5,
+        ease: 'power3.out',
+      })
+    }
+  }, [showSettings])
 
   const total = stats?.all_time.total_words ?? 0
 
@@ -91,12 +156,12 @@ export function VocabDashboard() {
         </div>
 
         {/* Today stats */}
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StaggerItem><StatCard icon={Zap} label="今日新词" value={stats?.today.new_words ?? 0} color="pink" /></StaggerItem>
-          <StaggerItem><StatCard icon={Target} label="今日复习" value={stats?.today.reviewed_words ?? 0} color="violet" /></StaggerItem>
-          <StaggerItem><StatCard icon={Flame} label="连续天数" value={stats?.streak_days ?? 0} color="amber" /></StaggerItem>
-          <StaggerItem><StatCard icon={Clock} label="待复习" value={stats?.words_due_today ?? 0} color="cyan" /></StaggerItem>
-        </StaggerContainer>
+        <div ref={statCardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard icon={Zap} label="今日新词" value={stats?.today.new_words ?? 0} color="pink" />
+          <StatCard icon={Target} label="今日复习" value={stats?.today.reviewed_words ?? 0} color="violet" />
+          <StatCard icon={Flame} label="连续天数" value={stats?.streak_days ?? 0} color="amber" />
+          <StatCard icon={Clock} label="待复习" value={stats?.words_due_today ?? 0} color="cyan" />
+        </div>
 
         {/* Status distribution + Start */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -160,7 +225,7 @@ export function VocabDashboard() {
         </div>
 
         {/* Quick modes */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div ref={quickActionsRef} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button onClick={() => navigate('/vocab/mastery')}
             className="glass-card-static p-5 text-left hover:border-violet-500/20 transition-colors group">
             <div className="flex items-center gap-3">
@@ -204,7 +269,7 @@ export function VocabDashboard() {
 
         {/* Settings panel */}
         {showSettings && settings && (
-          <div className="glass-card-static p-6">
+          <div ref={settingsRef} className="glass-card-static p-6">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-pink-500 to-pink-300" />
               <h2 className="font-display text-lg font-semibold text-slate-100">学习设置</h2>

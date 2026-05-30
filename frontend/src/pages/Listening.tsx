@@ -5,8 +5,11 @@ import { useTTS } from '@/hooks/useTTS'
 import type { ListeningPassage, ListeningPassageDetail, Question } from '@/types'
 import { Headphones, ChevronLeft, Play, Pause, RotateCcw, Volume2, SkipBack, SkipForward, Sparkles } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
-import { StaggerContainer } from '@/components/motion/StaggerContainer'
-import { StaggerItem } from '@/components/motion/StaggerItem'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { useGsapCounter } from '@/hooks/useGsap'
+
+gsap.registerPlugin(ScrollTrigger)
 
 function DifficultyBadge({ level }: { level: string }) {
   const map: Record<string, string> = {
@@ -31,6 +34,17 @@ export function Listening() {
   const [generatingAudio, setGeneratingAudio] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   const tts = useTTS()
+
+  // GSAP refs
+  const passageListRef = useRef<HTMLDivElement>(null)
+  const progressBarRef = useRef<HTMLDivElement>(null)
+  const audioSectionRef = useRef<HTMLDivElement>(null)
+  const questionsSectionRef = useRef<HTMLDivElement>(null)
+  const resultSectionRef = useRef<HTMLDivElement>(null)
+  const transcriptSectionRef = useRef<HTMLDivElement>(null)
+
+  // Score counter
+  const scoreCounter = useGsapCounter(result?.score ?? 0)
 
   useEffect(() => { api.get<ListeningPassage[]>('/listening/passages').then(setPassages) }, [])
 
@@ -77,6 +91,66 @@ export function Listening() {
     })
   }
 
+  // GSAP: stagger entrance for passage list
+  useEffect(() => {
+    if (!passageListRef.current || passages.length === 0) return
+    const ctx = gsap.context(() => {
+      gsap.from(passageListRef.current!.children, {
+        opacity: 0,
+        y: 24,
+        duration: 0.5,
+        stagger: 0.08,
+        ease: 'power3.out',
+      })
+    }, passageListRef)
+    return () => ctx.revert()
+  }, [passages])
+
+  // GSAP: smooth progress bar width transition
+  useEffect(() => {
+    if (progressBarRef.current) {
+      gsap.to(progressBarRef.current, {
+        width: `${tts.progress * 100}%`,
+        duration: 0.3,
+        ease: 'power2.out',
+        overwrite: 'auto',
+      })
+    }
+  }, [tts.progress])
+
+  // GSAP: ScrollTrigger for content sections
+  useEffect(() => {
+    if (!selected) return
+    const sections = [
+      audioSectionRef,
+      transcriptSectionRef,
+      questionsSectionRef,
+      resultSectionRef,
+    ]
+    const triggers: ScrollTrigger[] = []
+
+    // Delay to let DOM paint refs
+    const timeout = setTimeout(() => {
+      sections.forEach((ref) => {
+        if (!ref.current) return
+        const st = ScrollTrigger.create({
+          trigger: ref.current,
+          start: 'top 85%',
+          onEnter: () => {
+            gsap.fromTo(ref.current, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' })
+          },
+          once: true,
+        })
+        triggers.push(st)
+      })
+    }, 100)
+
+    return () => {
+      clearTimeout(timeout)
+      triggers.forEach((st) => st.kill())
+    }
+  }, [selected])
+
   if (!selected) return (
     <PageTransition>
       <div className="max-w-full lg:max-w-3xl space-y-8">
@@ -96,9 +170,9 @@ export function Listening() {
           </div>
         </div>
 
-        <StaggerContainer className="space-y-3">
+        <div ref={passageListRef} className="space-y-3">
           {passages.map((p) => (
-            <StaggerItem key={p.id}>
+            <div key={p.id}>
               <button
                 onClick={() => selectPassage(p.id)}
                 className="w-full text-left card-glow p-5 group"
@@ -116,18 +190,16 @@ export function Listening() {
                   <DifficultyBadge level={p.difficulty} />
                 </div>
               </button>
-            </StaggerItem>
+            </div>
           ))}
           {passages.length === 0 && (
-            <StaggerItem>
-              <div className="glass-card-static p-10 text-center">
-                <img src={MEDIA.listening.emptyState} alt="" className="w-24 h-24 rounded-2xl object-cover opacity-30 mx-auto mb-4" />
-                <p className="text-sm text-slate-400 font-medium">暂无听力题目</p>
-                <p className="text-xs text-slate-500 mt-1">请先运行 <code className="bg-white/[0.06] px-1.5 py-0.5 rounded text-xs font-mono text-slate-400">python seed_db.py</code> 初始化数据</p>
-              </div>
-            </StaggerItem>
+            <div className="glass-card-static p-10 text-center">
+              <img src={MEDIA.listening.emptyState} alt="" className="w-24 h-24 rounded-2xl object-cover opacity-30 mx-auto mb-4" />
+              <p className="text-sm text-slate-400 font-medium">暂无听力题目</p>
+              <p className="text-xs text-slate-500 mt-1">请先运行 <code className="bg-white/[0.06] px-1.5 py-0.5 rounded text-xs font-mono text-slate-400">python seed_db.py</code> 初始化数据</p>
+            </div>
           )}
-        </StaggerContainer>
+        </div>
       </div>
     </PageTransition>
   )
@@ -139,7 +211,7 @@ export function Listening() {
           <ChevronLeft className="h-4 w-4" /> 返回列表
         </button>
 
-        <div className="glass-card-static p-6">
+        <div ref={audioSectionRef} className="glass-card-static p-6">
           <div className="flex items-center justify-between mb-5">
             <h2 className="font-display text-xl font-semibold text-slate-100">{selected.title}</h2>
             <DifficultyBadge level={selected.difficulty} />
@@ -226,8 +298,7 @@ export function Listening() {
                 </div>
                 {tts.speaking && (
                   <div className="mt-3 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full transition-all duration-200"
-                      style={{ width: `${tts.progress * 100}%` }} />
+                    <div ref={progressBarRef} className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full" style={{ width: '0%' }} />
                   </div>
                 )}
               </>
@@ -239,14 +310,14 @@ export function Listening() {
             {showTranscript ? '隐藏原文' : '显示原文（跟读练习）'}
           </button>
           {showTranscript && (
-            <div className="bg-white/[0.03] rounded-xl p-5 mt-3 text-sm text-slate-300 leading-relaxed border border-white/[0.06]">
+            <div ref={transcriptSectionRef} className="bg-white/[0.03] rounded-xl p-5 mt-3 text-sm text-slate-300 leading-relaxed border border-white/[0.06]">
               {selected.transcript}
             </div>
           )}
         </div>
 
         {/* Questions */}
-        <div className="space-y-4">
+        <div ref={questionsSectionRef} className="space-y-4">
           {selected.questions.map((q: Question, i: number) => (
             <div key={q.id} className="glass-card-static p-5">
               <div className="flex items-start gap-3 mb-4">
@@ -291,9 +362,9 @@ export function Listening() {
             提交答案 ({Object.keys(answers).length}/{selected.questions.length})
           </button>
         ) : (
-          <div className="glass-card-static p-6 text-center">
+          <div ref={resultSectionRef} className="glass-card-static p-6 text-center">
             <div className="font-mono text-5xl font-bold text-cyan-400 mb-1">
-              {result.score}<span className="text-2xl text-slate-500">/{result.total_questions}</span>
+              <span ref={scoreCounter.ref}>0</span><span className="text-2xl text-slate-500">/{result.total_questions}</span>
             </div>
             <div className="text-sm text-slate-400 font-medium">正确率 {Math.round((result.score / result.total_questions) * 100)}%</div>
             <button onClick={handleBack} className="mt-4 text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors">

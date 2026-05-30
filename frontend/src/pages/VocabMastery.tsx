@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { useTTS } from '@/hooks/useTTS'
 import { useSoundEffects } from '@/hooks/useSoundEffects'
 import { useMasterySession } from '@/hooks/useMasterySession'
+import gsap from 'gsap'
 import type { VocabSettings, MasteryWord } from '@/types'
 import {
   ChevronLeft, Volume2, Eye, Lightbulb, Check, X,
@@ -13,23 +14,57 @@ import { PageTransition } from '@/components/motion/PageTransition'
 import { motion, AnimatePresence } from 'motion/react'
 
 function MasteryDots({ filled }: { filled: number }) {
+  const dotsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const container = dotsRef.current
+    if (!container) return
+    const dots = container.querySelectorAll<HTMLElement>('[data-dot]')
+    if (!dots.length) return
+
+    const ctx = gsap.context(() => {
+      dots.forEach((dot, i) => {
+        const shouldFill = [3, 2, 1][i] <= filled
+        if (shouldFill) {
+          gsap.fromTo(dot, {
+            scale: 0.5,
+            backgroundColor: 'rgb(255 255 255 / 0.1)',
+            boxShadow: 'none',
+          }, {
+            scale: 1,
+            backgroundColor: 'rgb(52 211 153)',
+            boxShadow: '0 0 6px rgba(52,211,153,0.4)',
+            duration: 0.35,
+            delay: i * 0.08,
+            ease: 'back.out(1.7)',
+          })
+        }
+      })
+    })
+    return () => ctx.revert()
+  }, [filled])
+
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div ref={dotsRef} className="flex flex-col items-center gap-1">
       {[3, 2, 1].map(n => (
-        <div key={n} className={`w-2 h-2 rounded-full transition-all duration-300 ${
-          n <= filled ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)]' : 'bg-white/10'
-        }`} />
+        <div
+          key={n}
+          data-dot={n}
+          className="w-2 h-2 rounded-full"
+          style={{
+            backgroundColor: n <= filled ? 'rgb(52 211 153)' : 'rgb(255 255 255 / 0.1)',
+            boxShadow: n <= filled ? '0 0 6px rgba(52,211,153,0.4)' : 'none',
+          }}
+        />
       ))}
     </div>
   )
 }
 
 function PhoneticDisplay({
-  word,
   phoneticUk,
   phoneticUs,
   accent,
-  onToggle,
   onSpeak,
 }: {
   word: string
@@ -69,6 +104,61 @@ function PhoneticDisplay({
   )
 }
 
+function HintDisplay({
+  showHint,
+  examples,
+  word,
+}: {
+  showHint: boolean
+  examples: MasteryWord['example_sentences']
+  word: string
+}) {
+  const hintRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = hintRef.current
+    if (!el) return
+
+    const ctx = gsap.context(() => {
+      if (showHint) {
+        gsap.fromTo(el, {
+          height: 0,
+          opacity: 0,
+          marginBottom: 0,
+        }, {
+          height: 'auto',
+          opacity: 1,
+          marginBottom: 16,
+          duration: 0.35,
+          ease: 'power3.out',
+        })
+      } else {
+        gsap.to(el, {
+          height: 0,
+          opacity: 0,
+          marginBottom: 0,
+          duration: 0.25,
+          ease: 'power3.in',
+        })
+      }
+    })
+    return () => ctx.revert()
+  }, [showHint])
+
+  if (showHint && examples.length > 0) {
+    return (
+      <div ref={hintRef} className="overflow-hidden">
+        <div className="bg-amber-500/[0.05] rounded-xl p-3.5 border border-amber-500/15 text-sm text-slate-300">
+          <p className="text-[10px] text-amber-400 font-semibold mb-1">提示 — 例句</p>
+          <p>{examples[0].en.replace(new RegExp(`\\b${word}\\b`, 'gi'), '______')}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{examples[0].cn}</p>
+        </div>
+      </div>
+    )
+  }
+  return null
+}
+
 function InfoScreen({
   word,
   isCorrect,
@@ -84,17 +174,28 @@ function InfoScreen({
   onSpeak: (text: string, a: 'us' | 'uk') => void
   onContinue: () => void
 }) {
+  const contentRef = useRef<HTMLDivElement>(null)
   const collocations: string[] = word.collocations ?? []
   const derivatives = word.derivatives ?? []
   const root = word.word_root ?? {}
 
+  // GSAP entrance animation for info screen
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+    const ctx = gsap.context(() => {
+      gsap.from(el, {
+        opacity: 0,
+        y: 20,
+        duration: 0.4,
+        ease: 'power3.out',
+      })
+    })
+    return () => ctx.revert()
+  }, [word.word_id, currentStage])
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
-      className="space-y-5"
-    >
+    <div ref={contentRef} className="space-y-5">
       {/* Result indicator */}
       <div className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold ${
         isCorrect
@@ -201,7 +302,7 @@ function InfoScreen({
         className="w-full btn-gradient py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
         继续
       </button>
-    </motion.div>
+    </div>
   )
 }
 
@@ -214,6 +315,11 @@ export function VocabMastery() {
   const [settings, setSettings] = useState<VocabSettings | null>(null)
   const [accent, setAccent] = useState<'us' | 'uk'>('us')
   const [elapsed, setElapsed] = useState(0)
+
+  // GSAP refs
+  const correctOptionRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const optionGridRef = useRef<HTMLDivElement>(null)
+  const ctxRef = useRef<gsap.Context | null>(null)
 
   useEffect(() => {
     api.get<VocabSettings>('/vocab/settings').then(s => {
@@ -231,6 +337,11 @@ export function VocabMastery() {
     }
   }, [m.phase])
 
+  // Cleanup GSAP context
+  useEffect(() => {
+    return () => ctxRef.current?.revert()
+  }, [])
+
   // Auto-pronounce on new question (NOT for stage 2 — would reveal the answer)
   useEffect(() => {
     if (m.phase === 'question' && m.currentWord && settings?.auto_pronounce && m.currentStage !== 2) {
@@ -243,6 +354,56 @@ export function VocabMastery() {
     if (m.isCorrect === true) sfx.playCorrect()
   }, [m.isCorrect])
 
+  // GSAP: correct option pulse + glow when answer is revealed
+  useEffect(() => {
+    if (!m.selectedKey || !m.currentWord) return
+
+    ctxRef.current?.revert()
+    const ctx = gsap.context(() => {
+      const correctKey = m.currentWord!.stage1_correct_key || m.currentWord!.stage2_correct_key
+      const correctBtn = correctOptionRefs.current.get(correctKey)
+      if (correctBtn) {
+        const tl = gsap.timeline()
+        tl.to(correctBtn, {
+          scale: 1.04,
+          duration: 0.15,
+          ease: 'power2.out',
+        })
+        tl.to(correctBtn, {
+          boxShadow: '0 0 30px rgba(16,185,129,0.5), inset 0 0 10px rgba(16,185,129,0.08)',
+          duration: 0.3,
+          ease: 'power2.out',
+        }, '<')
+        tl.to(correctBtn, {
+          scale: 1,
+          boxShadow: 'none',
+          duration: 0.4,
+          ease: 'power3.in',
+        })
+      }
+    })
+    ctxRef.current = ctx
+  }, [m.selectedKey, m.currentWord?.word_id])
+
+  // GSAP: stage transition entrance
+  useEffect(() => {
+    if (!optionGridRef.current) return
+
+    const ctx = gsap.context(() => {
+      const buttons = optionGridRef.current?.querySelectorAll('button')
+      if (buttons && buttons.length > 0) {
+        gsap.from(buttons, {
+          opacity: 0,
+          y: 12,
+          duration: 0.4,
+          stagger: 0.06,
+          ease: 'power3.out',
+        })
+      }
+    })
+    return () => ctx.revert()
+  }, [m.currentStage, m.currentWord?.word_id, m.phase])
+
   const speakWord = (a: 'us' | 'uk') => {
     if (m.currentWord) {
       setAccent(a)
@@ -252,6 +413,14 @@ export function VocabMastery() {
 
   const speakText = (text: string, a: 'us' | 'uk') => {
     tts.speak(text, 0.85, a)
+  }
+
+  const setOptionRef = (key: string) => (el: HTMLButtonElement | null) => {
+    if (el) {
+      correctOptionRefs.current.set(key, el)
+    } else {
+      correctOptionRefs.current.delete(key)
+    }
   }
 
   // ── Loading ──
@@ -377,18 +546,15 @@ export function VocabMastery() {
                     <p className="text-xs text-slate-500">先回想词义再选择，想不起来「看答案」</p>
                   </div>
 
-                  {/* Hint */}
-                  {m.showHint && word.example_sentences.length > 0 && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                      className="bg-amber-500/[0.05] rounded-xl p-3.5 border border-amber-500/15 text-sm text-slate-300">
-                      <p className="text-[10px] text-amber-400 font-semibold mb-1">提示 — 例句</p>
-                      <p>{word.example_sentences[0].en}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{word.example_sentences[0].cn}</p>
-                    </motion.div>
-                  )}
+                  {/* Hint with GSAP height animation */}
+                  <HintDisplay
+                    showHint={m.showHint}
+                    examples={word.example_sentences}
+                    word={word.word}
+                  />
 
                   {/* Options */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div ref={optionGridRef} className="grid grid-cols-2 gap-3">
                     {word.stage1_options.map(opt => {
                       let cls = 'border-white/[0.08] hover:border-white/[0.15] bg-white/[0.03]'
                       if (m.selectedKey !== null) {
@@ -398,6 +564,7 @@ export function VocabMastery() {
                       }
                       return (
                         <motion.button key={opt.key}
+                          ref={setOptionRef(opt.key)}
                           whileHover={m.selectedKey === null ? { scale: 1.02 } : {}}
                           whileTap={m.selectedKey === null ? { scale: 0.98 } : {}}
                           onClick={() => m.answerOption(opt.key)}
@@ -451,15 +618,13 @@ export function VocabMastery() {
                     </div>
                   </div>
 
-                  {m.showHint && word.example_sentences.length > 0 && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                      className="bg-amber-500/[0.05] rounded-xl p-3.5 border border-amber-500/15 text-sm text-slate-300">
-                      <p className="text-[10px] text-amber-400 font-semibold mb-1">提示 — 例句</p>
-                      <p>{word.example_sentences[0].en.replace(new RegExp(`\\b${word.word}\\b`, 'gi'), '______')}</p>
-                    </motion.div>
-                  )}
+                  <HintDisplay
+                    showHint={m.showHint}
+                    examples={word.example_sentences}
+                    word={word.word}
+                  />
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div ref={optionGridRef} className="grid grid-cols-2 gap-3">
                     {word.stage2_options.map(opt => {
                       let cls = 'border-white/[0.08] hover:border-white/[0.15] bg-white/[0.03]'
                       if (m.selectedKey !== null) {
@@ -469,6 +634,7 @@ export function VocabMastery() {
                       }
                       return (
                         <motion.button key={opt.key}
+                          ref={setOptionRef(opt.key)}
                           whileHover={m.selectedKey === null ? { scale: 1.02 } : {}}
                           whileTap={m.selectedKey === null ? { scale: 0.98 } : {}}
                           onClick={() => m.answerOption(opt.key)}

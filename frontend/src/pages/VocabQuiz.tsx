@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
+import gsap from 'gsap'
+import { useGsapShake } from '@/hooks/useGsap'
 import type { QuizSession, QuizResult } from '@/types'
 import { ChevronLeft, Star, Check, X, Zap, Trophy, RotateCcw, BookOpen, FileSearch } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -21,11 +23,43 @@ export function VocabQuiz() {
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set())
   const [elapsed, setElapsed] = useState(0)
 
+  // GSAP refs
+  const questionContainerRef = useRef<HTMLDivElement>(null)
+  const optionGridRef = useRef<HTMLDivElement>(null)
+  const optionRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const { ref: shakeRef } = useGsapShake<HTMLDivElement>()
+  const ctxRef = useRef<gsap.Context | null>(null)
+
   useEffect(() => {
     if (phase !== 'active') return
     const t = setInterval(() => setElapsed(e => e + 1), 1000)
     return () => clearInterval(t)
   }, [phase])
+
+  // Cleanup GSAP context
+  useEffect(() => {
+    return () => ctxRef.current?.revert()
+  }, [])
+
+  // Animate option buttons on each new question
+  useEffect(() => {
+    if (phase !== 'active' || !optionGridRef.current) return
+
+    ctxRef.current?.revert()
+    const ctx = gsap.context(() => {
+      const buttons = optionGridRef.current?.querySelectorAll('button')
+      if (buttons && buttons.length > 0) {
+        gsap.from(buttons, {
+          opacity: 0,
+          y: 12,
+          duration: 0.4,
+          stagger: 0.06,
+          ease: 'power3.out',
+        })
+      }
+    })
+    ctxRef.current = ctx
+  }, [currentIndex, phase])
 
   async function startQuiz() {
     setElapsed(0)
@@ -43,6 +77,42 @@ export function VocabQuiz() {
     setSelected(key)
     const q = session!.questions[currentIndex]
     setAnswers(prev => [...prev, { word_id: q.word_id, selected: key }])
+
+    // GSAP: shake on incorrect, pulse+glow on correct
+    const selectedBtn = optionRefs.current.get(key)
+    const correctKey = q.correct_key
+
+    if (key !== correctKey && selectedBtn) {
+      // Shake the wrong option
+      gsap.to(selectedBtn, {
+        x: [0, -8, 8, -6, 6, -3, 3, 0] as unknown as gsap.TweenValue,
+        duration: 0.5,
+        ease: 'power4.out',
+      })
+    }
+
+    // Pulse + glow on correct answer
+    const correctBtn = optionRefs.current.get(correctKey)
+    if (correctBtn) {
+      const tl = gsap.timeline()
+      tl.to(correctBtn, {
+        scale: 1.04,
+        duration: 0.15,
+        ease: 'power2.out',
+      })
+      tl.to(correctBtn, {
+        boxShadow: '0 0 30px rgba(16,185,129,0.5), inset 0 0 10px rgba(16,185,129,0.08)',
+        duration: 0.3,
+        ease: 'power2.out',
+      }, '<')
+      tl.to(correctBtn, {
+        scale: 1,
+        boxShadow: 'none',
+        duration: 0.4,
+        ease: 'power3.in',
+      })
+    }
+
     setPhase('reviewing')
   }
 
@@ -73,6 +143,14 @@ export function VocabQuiz() {
     } else {
       await api.post(`/vocab/bookmark/${word_id}`, {})
       setBookmarkedIds(prev => new Set(prev).add(word_id))
+    }
+  }
+
+  const setOptionRef = (key: string) => (el: HTMLButtonElement | null) => {
+    if (el) {
+      optionRefs.current.set(key, el)
+    } else {
+      optionRefs.current.delete(key)
     }
   }
 
@@ -202,7 +280,7 @@ export function VocabQuiz() {
 
   return (
     <PageTransition>
-      <div className="max-w-2xl mx-auto space-y-6 py-4">
+      <div ref={shakeRef} className="max-w-2xl mx-auto space-y-6 py-4">
         <div className="flex items-center justify-between">
           <button onClick={() => navigate('/vocab')}
             className="flex items-center gap-1.5 text-sm text-pink-400 hover:text-pink-300 transition-colors font-medium">
@@ -224,8 +302,14 @@ export function VocabQuiz() {
         </div>
 
         <AnimatePresence mode="wait">
-          <motion.div key={currentIndex} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.25 }} className="space-y-6">
+          <motion.div key={currentIndex}
+            ref={questionContainerRef}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-6"
+          >
             <div className="text-center py-6">
               <p className="text-[11px] tracking-wider text-slate-500 mb-3 font-medium">
                 {session.mode === 'word_to_def' ? '选择正确的中文释义' : '选择正确的英文单词'}
@@ -236,7 +320,7 @@ export function VocabQuiz() {
               <p className="font-mono text-base text-slate-500">{q.prompt_sub}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div ref={optionGridRef} className="grid grid-cols-2 gap-3">
               {q.options.map(opt => {
                 let cls = 'border-white/[0.08] hover:border-white/[0.15] bg-white/[0.03]'
                 if (phase === 'reviewing') {
@@ -246,6 +330,7 @@ export function VocabQuiz() {
                 }
                 return (
                   <motion.button key={opt.key}
+                    ref={setOptionRef(opt.key)}
                     whileHover={phase === 'active' ? { scale: 1.02 } : {}}
                     whileTap={phase === 'active' ? { scale: 0.98 } : {}}
                     onClick={() => phase === 'active' && selectOption(opt.key)}

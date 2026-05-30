@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
@@ -8,26 +8,42 @@ import {
 } from 'recharts'
 import { Flame, Clock, TrendingUp, BookOpen, Mic, PenLine, Headphones, BookA, FileText, BarChart3, ClipboardCheck, ChevronRight } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
-import { RevealSection } from '@/components/motion/RevealSection'
-import { motion } from 'motion/react'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { useGsapCounter } from '@/hooks/useGsap'
+
+gsap.registerPlugin(ScrollTrigger)
 
 function BentoStatCard({ icon: Icon, label, value, gradient, delay }: {
   icon: React.ElementType; label: string; value: string | number
   gradient: string; delay: number
 }) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const numericValue = typeof value === 'number' ? value : 0
+  const { ref: counterRef } = useGsapCounter<HTMLSpanElement>(numericValue, { duration: 1.5 })
+
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const ctx = gsap.context(() => {
+      gsap.fromTo(el,
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.7, delay, ease: 'power3.out' }
+      )
+    })
+    return () => ctx.revert()
+  }, [delay])
+
   return (
-    <motion.div
-      className="card-glow p-6 group"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 24, delay }}
-    >
+    <div ref={cardRef} className="card-glow p-6 group">
       <div className={`inline-flex p-2.5 rounded-xl mb-4 bg-gradient-to-br ${gradient} shadow-lg`}>
         <Icon className="h-5 w-5 text-white" />
       </div>
-      <div className="font-mono text-[2.5rem] font-bold text-slate-100 leading-none tracking-tight">{value}</div>
+      <div className="font-mono text-[2.5rem] font-bold text-slate-100 leading-none tracking-tight">
+        <span ref={counterRef}>{numericValue}</span>
+      </div>
       <div className="text-[13px] text-slate-400 mt-2 font-medium">{label}</div>
-    </motion.div>
+    </div>
   )
 }
 
@@ -78,11 +94,21 @@ function ModuleMarquee() {
   const navigate = useNavigate()
   const items = [...modules, ...modules]
 
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    gsap.to(e.currentTarget, { scale: 1.03, y: -2, duration: 0.3, ease: 'power2.out' })
+  }, [])
+
+  const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    gsap.to(e.currentTarget, { scale: 1, y: 0, duration: 0.6, ease: 'elastic.out(1, 0.5)' })
+  }, [])
+
   return (
     <div className="marquee">
       <div className="marquee-inner">
         {items.map(({ to, icon: Icon, label, color, desc }, i) => (
           <button key={`${to}-${i}`} onClick={() => navigate(to)}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
             className="flex items-center gap-3 px-5 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.12] transition-all group flex-shrink-0 cursor-pointer">
             <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center shadow-md`}>
               <Icon className="h-4 w-4 text-white" />
@@ -104,6 +130,56 @@ export function Dashboard() {
 
   useEffect(() => {
     api.get<DashboardData>('/progress/dashboard').then(setData).catch(() => {})
+  }, [])
+
+  // ScrollTrigger reveal refs
+  const moduleMarqueeRef = useRef<HTMLDivElement>(null)
+  const radarRef = useRef<HTMLDivElement>(null)
+  const heatmapRef = useRef<HTMLDivElement>(null)
+
+  // Reveal ModuleMarquee via ScrollTrigger
+  useEffect(() => {
+    const el = moduleMarqueeRef.current
+    if (!el) return
+    const st = ScrollTrigger.create({
+      trigger: el,
+      start: 'top 85%',
+      onEnter: () => {
+        gsap.fromTo(el, { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.7, delay: 0.1, ease: 'power3.out' })
+      },
+      once: true,
+    })
+    return () => st.kill()
+  }, [])
+
+  // Reveal Radar chart container via ScrollTrigger
+  useEffect(() => {
+    const el = radarRef.current
+    if (!el) return
+    const st = ScrollTrigger.create({
+      trigger: el,
+      start: 'top 88%',
+      onEnter: () => {
+        gsap.fromTo(el, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' })
+      },
+      once: true,
+    })
+    return () => st.kill()
+  }, [])
+
+  // Reveal Heatmap section via ScrollTrigger
+  useEffect(() => {
+    const el = heatmapRef.current
+    if (!el) return
+    const st = ScrollTrigger.create({
+      trigger: el,
+      start: 'top 85%',
+      onEnter: () => {
+        gsap.fromTo(el, { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.7, delay: 0.05, ease: 'power3.out' })
+      },
+      once: true,
+    })
+    return () => st.kill()
   }, [])
 
   const hour = new Date().getHours()
@@ -141,9 +217,9 @@ export function Dashboard() {
         </div>
 
         {/* Module marquee */}
-        <RevealSection delay={0.1}>
+        <div ref={moduleMarqueeRef}>
           <ModuleMarquee />
-        </RevealSection>
+        </div>
 
         {/* Bento stat grid */}
         <div className="bento-grid">
@@ -155,7 +231,7 @@ export function Dashboard() {
             gradient="from-emerald-500 to-emerald-400" delay={0.15} />
 
           {/* Radar chart — spans 2 cols */}
-          <div className="glass-card-static p-6">
+          <div ref={radarRef} className="glass-card-static p-6">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-300" />
               <h2 className="font-display text-lg font-semibold text-slate-100">四项技能</h2>
@@ -213,7 +289,7 @@ export function Dashboard() {
         </div>
 
         {/* Heatmap — scroll reveal */}
-        <RevealSection delay={0.05}>
+        <div ref={heatmapRef}>
           <div className="glass-card-static p-6">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-brand-400 to-brand-300" />
@@ -229,7 +305,7 @@ export function Dashboard() {
               <span>多</span>
             </div>
           </div>
-        </RevealSection>
+        </div>
       </div>
     </PageTransition>
   )

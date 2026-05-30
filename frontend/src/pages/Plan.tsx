@@ -1,16 +1,60 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
 import type { StudyPlan, PlanWeek } from '@/types'
 import { Sparkles, ChevronDown, ChevronUp, Loader2, ClipboardCheck } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
+import gsap from 'gsap'
+import { Flip } from 'gsap/Flip'
 
-function WeekCard({ week }: { week: PlanWeek }) {
+function WeekCard({ week, index }: { week: PlanWeek; index: number }) {
   const [open, setOpen] = useState(week.week === 1)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const ctxRef = useRef<gsap.Context | null>(null)
+
+  useEffect(() => {
+    return () => ctxRef.current?.revert()
+  }, [])
+
+  const toggle = () => {
+    if (!cardRef.current || !contentRef.current) {
+      setOpen(!open)
+      return
+    }
+
+    // GSAP Flip 实现平滑手风琴动画
+    const state = Flip.getState(contentRef.current, { props: 'height,opacity' })
+
+    setOpen(!open)
+
+    ctxRef.current?.revert()
+    ctxRef.current = gsap.context(() => {
+      Flip.from(state, {
+        duration: 0.45,
+        ease: 'power3.inOut',
+        absolute: true,
+        onEnter: (els) => {
+          gsap.fromTo(els, { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out', stagger: 0.03 })
+        },
+      })
+    })
+  }
+
+  // 入场动画
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    gsap.fromTo(el, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, delay: 0.1 + index * 0.08, ease: 'power3.out' })
+    // 初始状态记录
+    ctxRef.current?.revert()
+    ctxRef.current = gsap.context(() => {}, el)
+  }, [])
+
   return (
-    <div className="glass-card-static overflow-hidden">
+    <div ref={cardRef} className="glass-card-static overflow-hidden" style={{ opacity: 0 }}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.03] transition-colors"
       >
         <div className="flex items-center gap-4">
@@ -25,7 +69,7 @@ function WeekCard({ week }: { week: PlanWeek }) {
         {open ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
       </button>
       {open && (
-        <div className="border-t border-white/[0.06] px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div ref={contentRef} className="border-t border-white/[0.06] px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-3">
           {week.daily_tasks.map((dt) => (
             <div key={dt.day} className="bg-white/[0.03] rounded-lg p-3">
               <div className="text-xs font-semibold text-indigo-400 mb-2">{dt.day}</div>
@@ -48,10 +92,56 @@ export function Plan() {
   const [plan, setPlan] = useState<StudyPlan | null>(null)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ current_level: 'intermediate', target_score: 100, exam_date: '', weekly_hours: 10 })
+  const formRef = useRef<HTMLDivElement>(null)
+  const planRef = useRef<HTMLDivElement>(null)
+  const tipsRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const ctxRef = useRef<gsap.Context | null>(null)
 
   useEffect(() => {
     api.get<StudyPlan>('/plan/latest').then(p => { if (p.plan) setPlan(p as StudyPlan) }).catch(() => {})
+    return () => ctxRef.current?.revert()
   }, [])
+
+  // 计划生成后触发的入场动画
+  useEffect(() => {
+    if (!plan?.plan || !planRef.current) return
+
+    ctxRef.current?.revert()
+    ctxRef.current = gsap.context(() => {
+      const tl = gsap.timeline()
+
+      // 标题
+      tl.fromTo(planRef.current!.querySelector('h2')!, { opacity: 0, x: -10 }, {
+        opacity: 1, x: 0, duration: 0.4, ease: 'power3.out',
+      }, 0)
+
+      // 提示卡
+      if (tipsRef.current) {
+        tl.fromTo(tipsRef.current, { opacity: 0, y: 16, rotateX: 8 }, {
+          opacity: 1, y: 0, rotateX: 0, duration: 0.5, ease: 'back.out(1.4)',
+        }, 0.1)
+      }
+
+      // 周卡片已在 WeekCard 组件内各自入场
+    })
+  }, [plan?.plan])
+
+  // Loading 按钮脉冲
+  useEffect(() => {
+    if (!btnRef.current) return
+    if (loading) {
+      gsap.to(btnRef.current, {
+        scale: 1.03,
+        duration: 0.6,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+      })
+    } else {
+      gsap.to(btnRef.current, { scale: 1, duration: 0.2, overwrite: 'auto' })
+    }
+  }, [loading])
 
   async function generate() {
     if (!form.exam_date) return
@@ -59,6 +149,10 @@ export function Plan() {
     try {
       const result = await api.post<StudyPlan>('/plan/generate', form)
       setPlan(result)
+      // 成功后滚动到计划区域
+      setTimeout(() => {
+        planRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 200)
     } finally { setLoading(false) }
   }
 
@@ -82,7 +176,7 @@ export function Plan() {
         </div>
 
         {/* Form */}
-        <div className="glass-card-static p-6">
+        <div ref={formRef} className="glass-card-static p-6">
           <h2 className="font-display text-lg font-semibold text-slate-100 mb-5">生成新计划</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
             <div>
@@ -119,8 +213,8 @@ export function Plan() {
                 onChange={e => setForm({ ...form, weekly_hours: Number(e.target.value) })} />
             </div>
           </div>
-          <button onClick={generate} disabled={loading || !form.exam_date}
-            className="flex items-center gap-2 btn-gradient px-6 py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed">
+          <button ref={btnRef} onClick={generate} disabled={loading || !form.exam_date}
+            className="flex items-center gap-2 btn-gradient px-6 py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed relative overflow-hidden">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {loading ? 'AI 正在生成计划...' : '生成个性化计划'}
           </button>
@@ -128,7 +222,7 @@ export function Plan() {
 
         {/* Plan display */}
         {plan?.plan && (
-          <div className="space-y-5">
+          <div ref={planRef} className="space-y-5">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-indigo-500 to-violet-500" />
               <h2 className="font-display text-xl font-semibold text-slate-100">
@@ -137,7 +231,7 @@ export function Plan() {
             </div>
 
             {plan.plan.study_tips?.length > 0 && (
-              <div className="glass-card-static px-5 py-4 border-indigo-500/20">
+              <div ref={tipsRef} className="glass-card-static px-5 py-4 border-indigo-500/20" style={{ opacity: 0 }}>
                 <div className="text-xs font-semibold text-indigo-400 mb-2 uppercase tracking-wide">备考小贴士</div>
                 <ul className="space-y-1">
                   {plan.plan.study_tips.map((tip, i) => (
@@ -150,7 +244,7 @@ export function Plan() {
             )}
 
             <div className="space-y-3">
-              {plan.plan.weeks?.map(week => <WeekCard key={week.week} week={week} />)}
+              {plan.plan.weeks?.map((week, i) => <WeekCard key={week.week} week={week} index={i} />)}
             </div>
           </div>
         )}

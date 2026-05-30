@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
+import gsap from 'gsap'
 import type { BookmarkList } from '@/types'
 import { ChevronLeft, Star, Search, X, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -13,6 +14,11 @@ export function VocabBookmark() {
   const [page, setPage] = useState(1)
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
+  // GSAP refs
+  const listRef = useRef<HTMLDivElement>(null)
+  const starRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
+  const ctxRef = useRef<gsap.Context | null>(null)
+
   const fetchBookmarks = useCallback(async (p: number, s: string) => {
     const res = await api.get<BookmarkList>(`/vocab/bookmarks?page=${p}&per_page=50&search=${encodeURIComponent(s)}`)
     setData(res)
@@ -22,7 +28,67 @@ export function VocabBookmark() {
     fetchBookmarks(page, search)
   }, [page, search, fetchBookmarks])
 
+  // GSAP: stagger entrance for word list items
+  useEffect(() => {
+    const listEl = listRef.current
+    if (!listEl) return
+
+    ctxRef.current?.revert()
+    const ctx = gsap.context(() => {
+      const items = listEl.querySelectorAll<HTMLElement>('[data-bookmark-item]')
+      if (items.length > 0) {
+        gsap.from(items, {
+          opacity: 0,
+          y: 12,
+          duration: 0.4,
+          stagger: 0.05,
+          ease: 'power3.out',
+        })
+      }
+    })
+    ctxRef.current = ctx
+
+    return () => ctx.revert()
+  }, [data?.words?.map(w => w.id).join(','), page])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => ctxRef.current?.revert()
+  }, [])
+
+  const setStarRef = (id: number) => (el: HTMLButtonElement | null) => {
+    if (el) {
+      starRefs.current.set(id, el)
+    } else {
+      starRefs.current.delete(id)
+    }
+  }
+
   async function removeBookmark(wordId: number) {
+    // GSAP: star scale bounce before removal
+    const starEl = starRefs.current.get(wordId)
+    if (starEl) {
+      gsap.to(starEl, {
+        scale: 0.8,
+        duration: 0.1,
+        ease: 'power2.in',
+        onComplete: () => {
+          gsap.to(starEl, {
+            scale: 1.3,
+            duration: 0.2,
+            ease: 'back.out(2)',
+            onComplete: () => {
+              gsap.to(starEl, {
+                scale: 1,
+                duration: 0.15,
+                ease: 'power2.out',
+              })
+            },
+          })
+        },
+      })
+    }
+
     await api.delete(`/vocab/bookmark/${wordId}`)
     fetchBookmarks(page, search)
   }
@@ -79,11 +145,12 @@ export function VocabBookmark() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div ref={listRef} className="space-y-2">
             <AnimatePresence>
               {words.map(w => (
                 <motion.div
                   key={w.id}
+                  data-bookmark-item
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="glass-card-static p-4"
@@ -107,8 +174,11 @@ export function VocabBookmark() {
                       </div>
                     </button>
                     <div className="flex flex-col items-center gap-1 shrink-0">
-                      <button onClick={() => removeBookmark(w.id)}
-                        className="p-1.5 text-pink-400 hover:text-pink-300 transition-colors" title="取消收藏">
+                      <button
+                        ref={setStarRef(w.id)}
+                        onClick={() => removeBookmark(w.id)}
+                        className="p-1.5 text-pink-400 hover:text-pink-300 transition-colors" title="取消收藏"
+                      >
                         <Star className="h-4 w-4 fill-pink-400" />
                       </button>
                       {expandedId === w.id ? (
@@ -119,33 +189,7 @@ export function VocabBookmark() {
                     </div>
                   </div>
 
-                  <AnimatePresence>
-                    {expandedId === w.id && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="mt-4 pt-4 border-t border-white/[0.06] space-y-2">
-                          <p className="text-xs text-slate-500">英文释义</p>
-                          <p className="text-sm text-slate-300">{w.definition_en}</p>
-                          {w.example_sentences.length > 0 && (
-                            <>
-                              <p className="text-xs text-slate-500 mt-3">例句</p>
-                              {w.example_sentences.map((ex, i) => (
-                                <div key={i} className="text-sm space-y-0.5">
-                                  <p className="text-slate-300">{ex.en}</p>
-                                  <p className="text-slate-500 text-xs">{ex.cn}</p>
-                                </div>
-                              ))}
-                            </>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <ExpandSection expanded={expandedId === w.id} w={w} />
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -173,6 +217,66 @@ export function VocabBookmark() {
         )}
       </div>
     </PageTransition>
+  )
+}
+
+// Extracted expand section with GSAP height animation
+function ExpandSection({
+  expanded,
+  w,
+}: {
+  expanded: boolean
+  w: BookmarkList['words'][number]
+}) {
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+
+    const ctx = gsap.context(() => {
+      if (expanded) {
+        gsap.fromTo(el, {
+          height: 0,
+          opacity: 0,
+        }, {
+          height: 'auto',
+          opacity: 1,
+          duration: 0.3,
+          ease: 'power3.out',
+        })
+      } else {
+        gsap.to(el, {
+          height: 0,
+          opacity: 0,
+          duration: 0.25,
+          ease: 'power3.in',
+        })
+      }
+    })
+    return () => ctx.revert()
+  }, [expanded])
+
+  if (!expanded) return null
+
+  return (
+    <div ref={contentRef} className="overflow-hidden">
+      <div className="mt-4 pt-4 border-t border-white/[0.06] space-y-2">
+        <p className="text-xs text-slate-500">英文释义</p>
+        <p className="text-sm text-slate-300">{w.definition_en}</p>
+        {w.example_sentences.length > 0 && (
+          <>
+            <p className="text-xs text-slate-500 mt-3">例句</p>
+            {w.example_sentences.map((ex, i) => (
+              <div key={i} className="text-sm space-y-0.5">
+                <p className="text-slate-300">{ex.en}</p>
+                <p className="text-slate-500 text-xs">{ex.cn}</p>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 

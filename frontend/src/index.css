@@ -510,3 +510,88 @@ body::before {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
+
+/* ═══════════════════════════════════════════
+   GSAP UTILITY CLASSES
+   ═══════════════════════════════════════════ */
+
+/* 将被 GSAP 动画的元素初始隐藏 */
+.gsap-reveal {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* GSAP 动画目标性能优化 */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* ═══════════════════════════════════════════
+   ENTRANCE ANIMATION DOTS
+   ═══════════════════════════════════════════ */
+
+@keyframes entrance-dot-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
+  40% { transform: scale(1.2); opacity: 1; }
+}
+
+.entrance-dot {
+  animation: entrance-dot-bounce 1.4s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════
+   AUDIO VISUALIZER BARS
+   ═══════════════════════════════════════════ */
+
+.audio-visualizer-bar {
+  transition: height 0.05s ease;
+}
+
+/* ═══════════════════════════════════════════
+   CARD GLARE — for GSAP-enhanced 3D tilt
+   ═══════════════════════════════════════════ */
+
+.card-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 255, 255, 0.15) 0%,
+    transparent 60%
+  );
+  opacity: 0;
+  mix-blend-mode: overlay;
+}
+
+/* ═══════════════════════════════════════════
+   TIMER URGENCY PULSE — red flash
+   ═══════════════════════════════════════════ */
+
+@keyframes timer-urgency {
+  0%, 100% { color: rgb(239, 68, 68); }
+  50% { color: rgb(252, 165, 165); }
+}
+
+.timer-urgency {
+  animation: timer-urgency 0.8s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════
+   SUCCESS GLOW — achievement pulse
+   ═══════════════════════════════════════════ */
+
+@keyframes success-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
+  50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.4); }
+}
+
+.success-glow {
+  animation: success-glow 2s ease-in-out infinite;
+}

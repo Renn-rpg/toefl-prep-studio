@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useVocabSession } from '@/hooks/useVocabSession'
 import { useTTS } from '@/hooks/useTTS'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
+import gsap from 'gsap'
 import type { VocabSettings } from '@/types'
 import { ChevronLeft, Volume2, RotateCcw, Trophy, Zap, CheckCircle } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
@@ -17,12 +18,30 @@ const RATING_BUTTONS = [
 ]
 
 function ProgressBar({ current, total }: { current: number; total: number }) {
+  const barRef = useRef<HTMLDivElement>(null)
   const pct = total > 0 ? (current / total) * 100 : 0
+
+  useEffect(() => {
+    const el = barRef.current
+    if (!el) return
+    const ctx = gsap.context(() => {
+      gsap.to(el, {
+        width: `${pct}%`,
+        duration: 0.5,
+        ease: 'power3.out',
+      })
+    })
+    return () => ctx.revert()
+  }, [pct])
+
   return (
     <div className="flex items-center gap-4">
       <div className="flex-1 h-2 bg-white/[0.06] rounded-full overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-pink-500 to-violet-500 rounded-full transition-all duration-500"
-          style={{ width: `${pct}%` }} />
+        <div
+          ref={barRef}
+          className="h-full bg-gradient-to-r from-pink-500 to-violet-500 rounded-full"
+          style={{ width: '0%' }}
+        />
       </div>
       <span className="font-mono text-sm text-slate-400 whitespace-nowrap font-medium">
         {current}<span className="text-slate-600">/{total}</span>
@@ -37,6 +56,14 @@ export function VocabStudy() {
   const tts = useTTS()
   const [settings, setSettings] = useState<VocabSettings | null>(null)
   const [elapsed, setElapsed] = useState(0)
+  const [animating, setAnimating] = useState(false)
+
+  // Refs for GSAP
+  const cardWrapperRef = useRef<HTMLDivElement>(null)
+  const frontFaceRef = useRef<HTMLDivElement>(null)
+  const backFaceRef = useRef<HTMLDivElement>(null)
+  const ratingButtonsRef = useRef<HTMLDivElement>(null)
+  const ctxRef = useRef<gsap.Context | null>(null)
 
   useEffect(() => {
     api.get<VocabSettings>('/vocab/settings').then(setSettings).catch(() => {})
@@ -55,17 +82,87 @@ export function VocabStudy() {
     }
   }, [currentCard?.word_id, settings?.auto_pronounce])
 
+  // Cleanup GSAP context on unmount
+  useEffect(() => {
+    return () => ctxRef.current?.revert()
+  }, [])
+
+  // GSAP-driven card flip
+  useEffect(() => {
+    const cardEl = cardWrapperRef.current
+    if (!cardEl) return
+
+    ctxRef.current?.revert()
+    const ctx = gsap.context(() => {
+      if (flipped) {
+        // Pulse scale-up before flip, then flip
+        const tl = gsap.timeline()
+        tl.to(cardEl, {
+          scale: 1.03,
+          duration: 0.15,
+          ease: 'power2.out',
+        })
+        tl.to(cardEl, {
+          rotationY: 180,
+          duration: 0.6,
+          ease: 'power2.inOut',
+          onStart: () => setAnimating(true),
+          onComplete: () => setAnimating(false),
+        }, '>')
+
+        // Bounce entrance for rating buttons when back is revealed
+        const ratingBtns = ratingButtonsRef.current?.querySelectorAll('button')
+        if (ratingBtns && ratingBtns.length > 0) {
+          tl.from(ratingBtns, {
+            opacity: 0,
+            y: 20,
+            scale: 0.9,
+            duration: 0.4,
+            stagger: 0.05,
+            ease: 'back.out(1.7)',
+            onStart: () => setAnimating(true),
+          }, '-=0.3')
+        }
+      } else {
+        // Flip back to front
+        const tl = gsap.timeline()
+        tl.to(cardEl, {
+          rotationY: 0,
+          duration: 0.6,
+          ease: 'power2.inOut',
+          onStart: () => setAnimating(true),
+          onComplete: () => setAnimating(false),
+        })
+      }
+    })
+    ctxRef.current = ctx
+
+    return () => ctx.revert()
+  }, [flipped])
+
+  // Wrap flip() to prevent double-clicks during animation
+  const handleFlip = useCallback(() => {
+    if (animating) return
+    flip()
+  }, [animating, flip])
+
+  // Wrap rate() similarly
+  const handleRate = useCallback((rating: number) => {
+    if (animating) return
+    rate(rating)
+  }, [animating, rate])
+
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === ' ' && !flipped) { e.preventDefault(); flip(); return }
+      if (e.key === ' ' && !flipped) { e.preventDefault(); handleFlip(); return }
       if (flipped) {
         const idx = ['1', '2', '3', '4'].indexOf(e.key)
-        if (idx >= 0) rate(idx)
+        if (idx >= 0) handleRate(idx)
       }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [flipped, flip, rate])
+  }, [flipped, handleFlip, handleRate])
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -160,18 +257,25 @@ export function VocabStudy() {
 
         <ProgressBar current={currentIndex + 1} total={cards.length} />
 
-        {/* Card with tilt */}
-        <motion.div
-          className="perspective-1000"
-          whileHover={{ scale: 1.01 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        >
+        {/* Card with GSAP-driven 3D flip */}
+        <div className="flex justify-center">
           <div
-            className={`relative preserve-3d transition-transform duration-500 ease-out ${flipped ? 'rotate-y-180' : ''}`}
-            style={{ minHeight: 380 }}
+            ref={cardWrapperRef}
+            className="relative preserve-3d"
+            style={{
+              width: '100%',
+              maxWidth: '560px',
+              minHeight: 380,
+              transformStyle: 'preserve-3d',
+              perspective: '1000px',
+            }}
           >
             {/* FRONT */}
-            <div className="absolute inset-0 backface-hidden">
+            <div
+              ref={frontFaceRef}
+              className="absolute inset-0 backface-hidden"
+              style={{ backfaceVisibility: 'hidden' }}
+            >
               <div className="glass-card-elevated p-10 h-full flex flex-col items-center justify-center text-center">
                 <div className="mb-3">
                   <span className={`text-[11px] px-3 py-1 rounded-full font-medium border ${
@@ -197,7 +301,7 @@ export function VocabStudy() {
                   <Volume2 className={`h-6 w-6 ${tts.speaking ? 'text-pink-400 animate-pulse' : 'text-pink-500'}`} />
                 </button>
 
-                <button onClick={flip}
+                <button onClick={handleFlip}
                   className="btn-gradient px-10 py-3.5 rounded-xl text-sm font-semibold">
                   显示释义
                 </button>
@@ -206,7 +310,11 @@ export function VocabStudy() {
             </div>
 
             {/* BACK */}
-            <div className="absolute inset-0 backface-hidden rotate-y-180">
+            <div
+              ref={backFaceRef}
+              className="absolute inset-0 backface-hidden"
+              style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+            >
               <div className="glass-card-elevated p-8 h-full flex flex-col">
                 <div className="text-center mb-6">
                   <h2 className="font-display text-3xl font-bold text-slate-100 mb-1">{card.word}</h2>
@@ -240,9 +348,9 @@ export function VocabStudy() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-4 gap-2.5 mt-6 pt-4 border-t border-white/[0.06]">
+                <div ref={ratingButtonsRef} className="grid grid-cols-4 gap-2.5 mt-6 pt-4 border-t border-white/[0.06]">
                   {RATING_BUTTONS.map(({ rating: r, label, color, shadow, hotkey }) => (
-                    <motion.button key={r} onClick={() => rate(r)}
+                    <motion.button key={r} onClick={() => handleRate(r)}
                       whileHover={{ scale: 1.04 }}
                       whileTap={{ scale: 0.96 }}
                       transition={{ type: 'spring', stiffness: 400, damping: 20 }}
@@ -255,7 +363,7 @@ export function VocabStudy() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </PageTransition>
   )

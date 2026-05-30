@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
 import type { ReadingPassage, ReadingPassageDetail, Question, VocabHighlight } from '@/types'
 import { ChevronLeft, BookOpen } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
-import { StaggerContainer } from '@/components/motion/StaggerContainer'
-import { StaggerItem } from '@/components/motion/StaggerItem'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { useGsapCounter } from '@/hooks/useGsap'
+
+gsap.registerPlugin(ScrollTrigger)
 
 export function Reading() {
   const [passages, setPassages] = useState<ReadingPassage[]>([])
@@ -13,6 +16,16 @@ export function Reading() {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [result, setResult] = useState<{ score: number; total_questions: number } | null>(null)
   const [activeWord, setActiveWord] = useState<VocabHighlight | null>(null)
+
+  // GSAP refs
+  const passageListRef = useRef<HTMLDivElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const contentSectionRef = useRef<HTMLDivElement>(null)
+  const questionsSectionRef = useRef<HTMLDivElement>(null)
+  const resultSectionRef = useRef<HTMLDivElement>(null)
+
+  // Score counter
+  const scoreCounter = useGsapCounter(result?.score ?? 0)
 
   useEffect(() => { api.get<ReadingPassage[]>('/reading/passages').then(setPassages) }, [])
 
@@ -50,6 +63,63 @@ export function Reading() {
     })
   }
 
+  // GSAP: stagger entrance for passage list
+  useEffect(() => {
+    if (!passageListRef.current || passages.length === 0) return
+    const ctx = gsap.context(() => {
+      gsap.from(passageListRef.current!.children, {
+        opacity: 0,
+        y: 24,
+        duration: 0.5,
+        stagger: 0.08,
+        ease: 'power3.out',
+      })
+    }, passageListRef)
+    return () => ctx.revert()
+  }, [passages])
+
+  // GSAP: bounce-scale popup when a vocab word is clicked
+  useEffect(() => {
+    if (activeWord && popupRef.current) {
+      gsap.from(popupRef.current, {
+        scale: 0,
+        duration: 0.6,
+        ease: 'back.out(1.7)',
+      })
+    }
+  }, [activeWord?.word])
+
+  // GSAP: ScrollTrigger for content sections
+  useEffect(() => {
+    if (!selected) return
+    const sections = [
+      contentSectionRef,
+      questionsSectionRef,
+      resultSectionRef,
+    ]
+    const triggers: ScrollTrigger[] = []
+
+    const timeout = setTimeout(() => {
+      sections.forEach((ref) => {
+        if (!ref.current) return
+        const st = ScrollTrigger.create({
+          trigger: ref.current,
+          start: 'top 85%',
+          onEnter: () => {
+            gsap.fromTo(ref.current, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' })
+          },
+          once: true,
+        })
+        triggers.push(st)
+      })
+    }, 100)
+
+    return () => {
+      clearTimeout(timeout)
+      triggers.forEach((st) => st.kill())
+    }
+  }, [selected])
+
   if (!selected) return (
     <PageTransition>
       <div className="max-w-full lg:max-w-3xl space-y-8">
@@ -69,9 +139,9 @@ export function Reading() {
           </div>
         </div>
 
-        <StaggerContainer className="space-y-3">
+        <div ref={passageListRef} className="space-y-3">
           {passages.map((p) => (
-            <StaggerItem key={p.id}>
+            <div key={p.id}>
               <button onClick={() => selectPassage(p.id)}
                 className="w-full text-left card-glow p-5 group">
                 <div className="flex items-center justify-between">
@@ -88,9 +158,9 @@ export function Reading() {
                   }`}>{p.difficulty === 'easy' ? '简单' : p.difficulty === 'hard' ? '困难' : '中等'}</span>
                 </div>
               </button>
-            </StaggerItem>
+            </div>
           ))}
-        </StaggerContainer>
+        </div>
       </div>
     </PageTransition>
   )
@@ -102,7 +172,7 @@ export function Reading() {
           <ChevronLeft className="h-4 w-4" /> 返回列表
         </button>
 
-        <div className="glass-card-static p-6">
+        <div ref={contentSectionRef} className="glass-card-static p-6">
           <h2 className="font-display text-xl font-semibold text-slate-100 mb-5">{selected.title}</h2>
           <div className="text-sm leading-[1.8] text-slate-300">
             {renderContent(selected.content, selected.vocab_highlights)}
@@ -110,7 +180,7 @@ export function Reading() {
         </div>
 
         {activeWord && (
-          <div className="glass-card-elevated p-4 flex items-start justify-between border-emerald-500/20">
+          <div key={activeWord.word} ref={popupRef} className="glass-card-elevated p-4 flex items-start justify-between border-emerald-500/20">
             <div>
               <span className="font-semibold text-emerald-400 font-display text-lg">{activeWord.word}</span>
               <span className="text-slate-300 text-sm ml-3">— {activeWord.definition}</span>
@@ -119,7 +189,7 @@ export function Reading() {
           </div>
         )}
 
-        <div className="space-y-4">
+        <div ref={questionsSectionRef} className="space-y-4">
           {selected.questions.map((q: Question, i: number) => (
             <div key={q.id} className="glass-card-static p-5">
               <div className="flex items-start gap-3 mb-4">
@@ -164,9 +234,9 @@ export function Reading() {
             提交答案 ({Object.keys(answers).length}/{selected.questions.length})
           </button>
         ) : (
-          <div className="glass-card-static p-6 text-center">
+          <div ref={resultSectionRef} className="glass-card-static p-6 text-center">
             <div className="font-mono text-5xl font-bold text-emerald-400 mb-1">
-              {result.score}<span className="text-2xl text-slate-500">/{result.total_questions}</span>
+              <span ref={scoreCounter.ref}>0</span><span className="text-2xl text-slate-500">/{result.total_questions}</span>
             </div>
             <div className="text-sm text-slate-400 font-medium">正确率 {Math.round((result.score / result.total_questions) * 100)}%</div>
             <button onClick={() => setSelected(null)} className="mt-4 text-sm text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
