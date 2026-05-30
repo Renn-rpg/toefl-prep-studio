@@ -89,6 +89,7 @@ def calculate_next_review(progress: VocabProgress, rating: int) -> dict:
 def list_words(
     status: Optional[str] = None,
     difficulty: Optional[int] = None,
+    frequency_tier: Optional[str] = Query(None, pattern="^(high|medium|low)$"),
     search: Optional[str] = None,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -97,9 +98,16 @@ def list_words(
     query = select(VocabWord)
     if difficulty:
         query = query.where(VocabWord.difficulty == difficulty)
+    if frequency_tier:
+        if frequency_tier == "high":
+            query = query.where(VocabWord.frequency_rank >= 50)
+        elif frequency_tier == "medium":
+            query = query.where(VocabWord.frequency_rank >= 10, VocabWord.frequency_rank < 50)
+        elif frequency_tier == "low":
+            query = query.where(VocabWord.frequency_rank < 10)
     if search:
         query = query.where(col(VocabWord.word).contains(search))
-    query = query.order_by(VocabWord.frequency_rank)
+    query = query.order_by(VocabWord.frequency_rank.desc())
 
     total = session.exec(select(func.count()).select_from(query.subquery())).one()
     words = session.exec(query.offset((page - 1) * per_page).limit(per_page)).all()
@@ -116,6 +124,8 @@ def list_words(
             "id": w.id, "word": w.word, "phonetic": w.phonetic,
             "part_of_speech": w.part_of_speech, "difficulty": w.difficulty,
             "definition_cn": w.definition_cn, "status": word_status,
+            "frequency_rank": w.frequency_rank,
+            "tags": json.loads(w.tags_json),
         })
 
     return {"words": result, "total": total, "page": page, "per_page": per_page}
@@ -177,6 +187,8 @@ def get_next_cards(
                 "definition_en": word.definition_en, "definition_cn": word.definition_cn,
                 "example_sentences": json.loads(word.example_sentences_json),
                 "status": p.status, "repetitions": p.repetitions,
+                "frequency_rank": word.frequency_rank,
+                "tags": json.loads(word.tags_json),
             })
 
     remaining = limit - len(cards)
@@ -190,7 +202,7 @@ def get_next_cards(
 
         if fetch > 0:
             known_ids = session.exec(select(VocabProgress.word_id)).all()
-            query = select(VocabWord).order_by(VocabWord.difficulty, VocabWord.frequency_rank)
+            query = select(VocabWord).order_by(VocabWord.frequency_rank.desc())
             if known_ids:
                 query = query.where(col(VocabWord.id).notin_(known_ids))
             new_words = session.exec(query.limit(fetch)).all()
@@ -204,6 +216,8 @@ def get_next_cards(
                     "definition_en": w.definition_en, "definition_cn": w.definition_cn,
                     "example_sentences": json.loads(w.example_sentences_json),
                     "status": "new", "repetitions": 0,
+                    "frequency_rank": w.frequency_rank,
+                    "tags": json.loads(w.tags_json),
                 })
             session.commit()
 
@@ -315,6 +329,19 @@ def get_stats(session: Session = Depends(get_session)):
         .where(VocabProgress.status != "mastered")
     ).one()
 
+    # Frequency tier distribution
+    all_words = session.exec(select(VocabWord)).all()
+    tier_high_ids = {w.id for w in all_words if w.frequency_rank >= 50}
+    tier_medium_ids = {w.id for w in all_words if 10 <= w.frequency_rank < 50}
+    tier_low_ids = {w.id for w in all_words if w.frequency_rank < 10}
+
+    def _tier_stats(tier_ids):
+        mastered = sum(1 for p in progresses if p.word_id in tier_ids and p.status == "mastered")
+        reviewing = sum(1 for p in progresses if p.word_id in tier_ids and p.status == "reviewing")
+        learning = sum(1 for p in progresses if p.word_id in tier_ids and p.status == "learning")
+        new_count = len(tier_ids) - mastered - reviewing - learning
+        return {"total": len(tier_ids), "mastered": mastered, "reviewing": reviewing, "learning": learning, "new": max(0, new_count)}
+
     return {
         "today": {
             "new_words": today_session.new_words_count if today_session else 0,
@@ -332,6 +359,11 @@ def get_stats(session: Session = Depends(get_session)):
             "reviewing": status_counts["reviewing"],
             "learning": status_counts["learning"],
             "new": status_counts["new"],
+        },
+        "frequency_tiers": {
+            "high": _tier_stats(tier_high_ids),
+            "medium": _tier_stats(tier_medium_ids),
+            "low": _tier_stats(tier_low_ids),
         },
         "streak_days": streak,
         "words_due_today": due_count,
@@ -407,7 +439,7 @@ def get_quiz(
     remaining = count - len(target_words)
     if remaining > 0:
         known_ids = session.exec(select(VocabProgress.word_id)).all()
-        query = select(VocabWord).order_by(VocabWord.difficulty, VocabWord.frequency_rank)
+        query = select(VocabWord).order_by(VocabWord.frequency_rank.desc())
         if known_ids:
             query = query.where(col(VocabWord.id).notin_(known_ids))
         new_words = session.exec(query.limit(remaining)).all()
@@ -656,6 +688,8 @@ def _build_mastery_word(word: VocabWord, prog: VocabProgress | None) -> dict:
         "word_root": json.loads(word.word_root_json) if word.word_root_json and word.word_root_json != "{}" else {},
         "mastery_stage": prog.mastery_stage if prog else 0,
         "status": prog.status if prog else "new",
+        "frequency_rank": word.frequency_rank,
+        "tags": json.loads(word.tags_json),
     }
 
 
@@ -746,7 +780,7 @@ def get_mastery_session(
 
         if fetch > 0:
             known_ids = session.exec(select(VocabProgress.word_id)).all()
-            query = select(VocabWord).order_by(VocabWord.difficulty, VocabWord.frequency_rank)
+            query = select(VocabWord).order_by(VocabWord.frequency_rank.desc())
             if known_ids:
                 query = query.where(col(VocabWord.id).notin_(known_ids))
             new_words = session.exec(query.limit(fetch)).all()

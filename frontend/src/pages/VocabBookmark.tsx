@@ -5,6 +5,7 @@ import gsap from 'gsap'
 import type { BookmarkList } from '@/types'
 import { ChevronLeft, Star, Search, X, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
+import { TierBadge } from '@/components/TierBadge'
 import { motion, AnimatePresence } from 'motion/react'
 
 export function VocabBookmark() {
@@ -170,6 +171,7 @@ export function VocabBookmark() {
                       <p className="text-sm text-slate-300 pr-2">{w.definition_cn}</p>
                       <div className="flex items-center gap-3 mt-2">
                         <StatusBadge status={w.status} />
+                        <TierBadge frequencyRank={w.frequency_rank} tags={w.tags} />
                         <span className="text-xs text-slate-600">难度 {w.difficulty}/5</span>
                       </div>
                     </button>

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { MEDIA } from '@/lib/media'
-import type { VocabStats, VocabSettings } from '@/types'
+import type { VocabStats, VocabSettings, FrequencyTier } from '@/types'
 import { BookA, Flame, Target, Clock, Zap, Settings, ChevronRight, FileSearch, Star, Brain, Volume2 } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
 import gsap from 'gsap'
@@ -149,7 +149,7 @@ export function VocabDashboard() {
               </div>
               <div>
                 <h1 className="font-display text-[1.75rem] font-bold text-slate-100 tracking-tight">词汇背诵</h1>
-                <p className="text-slate-400 text-sm">间隔重复，科学记忆 400 个 TOEFL 核心词汇</p>
+                <p className="text-slate-400 text-sm">{total} 个 TOEFL 词汇 · 基于真题词频，重点突破</p>
               </div>
             </div>
           </div>
@@ -223,6 +223,47 @@ export function VocabDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Frequency tier distribution */}
+        {stats?.frequency_tiers && (
+          <div className="glass-card-static p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-rose-500 to-rose-300" />
+              <h2 className="font-display text-lg font-semibold text-slate-100">考频分布</h2>
+              <span className="text-[11px] text-slate-500 ml-2">基于托福真题 + AWL 学术词表</span>
+            </div>
+            <p className="text-xs text-slate-500 mb-6">高频词优先推荐学习，提高备考效率</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {(['high', 'medium', 'low'] as FrequencyTier[]).map(tier => {
+                const data = stats.frequency_tiers![tier]
+                const config = {
+                  high:   { label: '高频核心词', bar: 'bg-gradient-to-r from-rose-500 to-rose-400', dot: 'bg-rose-500', desc: '真题出现 ≥30次 或 AWL 1-3级' },
+                  medium: { label: '中频词', bar: 'bg-gradient-to-r from-amber-500 to-amber-400', dot: 'bg-amber-500', desc: '真题出现 10-29次 或 AWL 4-7级' },
+                  low:    { label: '低频词', bar: 'bg-gradient-to-r from-slate-500 to-slate-400', dot: 'bg-slate-500', desc: '其他词汇' },
+                }[tier]
+                const masteredPct = data.total > 0 ? Math.round(data.mastered / data.total * 100) : 0
+                return (
+                  <div key={tier} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${config.dot}`} />
+                      <span className="text-sm font-semibold text-slate-200">{config.label}</span>
+                      <span className="font-mono text-xs text-slate-500">{data.total} 词</span>
+                    </div>
+                    <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                      <div className={`h-full ${config.bar} rounded-full transition-all duration-1000`}
+                        style={{ width: `${masteredPct}%` }} />
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>已掌握 {data.mastered}</span>
+                      <span>{masteredPct}%</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">{config.desc}</p>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Quick modes */}
         <div ref={quickActionsRef} className="grid grid-cols-1 md:grid-cols-3 gap-4">

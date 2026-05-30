@@ -8,6 +8,7 @@ import gsap from 'gsap'
 import type { VocabSettings } from '@/types'
 import { ChevronLeft, Volume2, RotateCcw, Trophy, Zap, CheckCircle } from 'lucide-react'
 import { PageTransition } from '@/components/motion/PageTransition'
+import { TierBadge } from '@/components/TierBadge'
 import { motion } from 'motion/react'
 
 const RATING_BUTTONS = [
@@ -289,6 +290,7 @@ export function VocabStudy() {
                       : card.status === 'reviewing' ? '复习中'
                       : '已掌握'}
                   </span>
+                  <TierBadge frequencyRank={card.frequency_rank} tags={card.tags} className="ml-1.5" />
                 </div>
 
                 <h2 className="font-display text-[3.25rem] font-bold text-slate-100 mb-3 tracking-tight leading-none">
@@ -322,6 +324,7 @@ export function VocabStudy() {
                     <span className="font-mono">{card.phonetic}</span>
                     <span className="text-slate-600">·</span>
                     <span className="italic">{card.part_of_speech}</span>
+                    <TierBadge frequencyRank={card.frequency_rank} tags={card.tags} />
                     <button onClick={() => tts.speak(card.word, 0.8)} className="ml-1">
                       <Volume2 className="h-4 w-4 text-pink-400 hover:text-pink-300 transition-colors" />
                     </button>

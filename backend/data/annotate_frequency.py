@@ -1,0 +1,828 @@
+"""
+Annotate toefl_vocab.json with frequency tiers based on:
+1. TOEFL exam frequency data (actual occurrence counts from real exams)
+2. AWL (Academic Word List) sublist membership
+
+Tier logic:
+- 高频核心词: TOEFL exam freq >= 30 OR AWL Sublist 1-3
+- 中频词: TOEFL exam freq >= 10 OR AWL Sublist 4-7
+- 低频词: all others
+"""
+
+import json
+import re
+from pathlib import Path
+
+DATA_DIR = Path(__file__).parent
+
+# ============================================================
+# Data Source 1: TOEFL Exam Frequency (from real exam stats)
+# ============================================================
+TOEFL_EXAM_FREQ = {
+    # 200+ occurrences (~20 words)
+    "fundamental": 308, "species": 298, "affect": 287, "approach": 282,
+    "appropriate": 269, "economic": 262, "bully": 256, "complicated": 255,
+    "strategy": 251, "agent": 250, "breed": 248, "associate": 246,
+    "analyse": 223, "analyze": 223, "boredom": 242, "represent": 236,
+    "adapt": 234, "route": 234, "council": 224, "replace": 216,
+
+    # 100-200 occurrences (~30 words)
+    "coconut": 191, "despite": 185, "habitat": 180, "deposit": 177,
+    "institute": 174, "reserve": 162, "extend": 160, "recommend": 158,
+    "award": 158, "bilingual": 130, "purchase": 126, "ignore": 126,
+    "register": 126, "arctic": 125, "external": 123, "campaign": 120,
+    "assess": 115, "efficient": 109, "canal": 108, "circumstance": 106,
+    "constant": 105, "endanger": 104, "seminar": 100,
+
+    # 50-100 occurrences (~30 words)
+    "cargo": 72, "compound": 68, "vertical": 68, "span": 66,
+    "quantity": 65, "debate": 62, "grant": 61, "applicant": 60,
+    "cater": 59, "casual": 58, "mould": 57, "mold": 57,
+    "therapy": 56, "psychological": 56, "ingredient": 55, "core": 54,
+    "descend": 53, "indigenous": 52, "couple": 51, "architect": 50,
+
+    # 30-50 occurrences (~30 words)
+    "discipline": 49, "emphasise": 49, "emphasize": 49, "exhibit": 48,
+    "trail": 47, "fragile": 46, "internal": 45, "accurate": 44,
+    "dynamic": 44, "frame": 44, "layer": 44, "modify": 44,
+    "residence": 44, "personnel": 43, "degradation": 43, "carve": 42,
+    "element": 41, "remote": 40, "brochure": 39, "dramatic": 38,
+    "fancy": 38, "settler": 37, "contemporary": 36,
+
+    # 20-30 occurrences (~15 words)
+    "relatively": 29, "committed": 28, "indicate": 27, "fossil": 25,
+    "application": 24, "sculpture": 23, "distinguish": 22, "mammal": 22,
+    "cafeteria": 21, "compose": 21,
+
+    # 15-20 occurrences (~25 words)
+    "concentrate": 20, "contain": 20, "demonstrate": 20, "dinosaur": 20,
+    "landscape": 20, "orchestra": 20, "sculptor": 20, "bacterial": 18,
+    "impact": 18, "originate": 18, "resemble": 18, "anthropologist": 17,
+    "construct": 17, "psychology": 17, "content": 16, "description": 16,
+    "eclipse": 16, "frequently": 16, "prehistoric": 16, "prominent": 16,
+    "release": 16, "resistance": 16,
+
+    # 12-15 occurrences (~35 words)
+    "carbon": 15, "characteristic": 15, "endanger": 15, "estimate": 15,
+    "flourish": 15, "institution": 15, "literary": 15, "rhythm": 15,
+    "variety": 15, "volcanic": 15, "aluminum": 14, "characterize": 14,
+    "communication": 14, "component": 14, "depression": 14, "dissolve": 14,
+    "galaxy": 14, "tuition": 14, "artistic": 13, "behavior": 13,
+    "conventional": 13, "filter": 13, "predator": 13, "registration": 13,
+    "textile": 13, "alloy": 12, "aquatic": 12, "considerable": 12,
+    "continental": 12, "decay": 12, "depreciate": 12, "distinctive": 12,
+    "erosion": 12, "fabric": 12, "generate": 12, "limestone": 12,
+    "majority": 12, "molecule": 12, "orbit": 12, "precipitation": 12,
+    "regardless": 12, "reptile": 12, "sophisticate": 12, "vacuum": 12,
+    "vehicle": 12,
+}
+
+# ============================================================
+# Data Source 2: AWL (Academic Word List) — Coxhead 2000
+# 570 headwords across 10 sublists
+# ============================================================
+AWL_SUBLISTS = {
+    1: ["analyse", "approach", "area", "assess", "assume", "authority",
+        "available", "benefit", "concept", "consist", "constitute", "context",
+        "contract", "create", "data", "define", "derive", "distribute",
+        "economy", "environment", "establish", "estimate", "evident", "export",
+        "factor", "finance", "formula", "function", "identify", "income",
+        "indicate", "individual", "interpret", "involve", "issue", "labour",
+        "legal", "legislate", "major", "method", "occur", "percent", "period",
+        "policy", "principle", "proceed", "process", "require", "research",
+        "respond", "role", "section", "sector", "significant", "similar",
+        "source", "specific", "structure", "theory", "vary"],
+    2: ["achieve", "acquire", "administrate", "affect", "appropriate",
+        "aspect", "assist", "category", "chapter", "commission", "community",
+        "complex", "compute", "conclude", "conduct", "consequent", "construct",
+        "consume", "credit", "culture", "design", "distinct", "element",
+        "equate", "evaluate", "feature", "final", "focus", "impact", "injure",
+        "institute", "invest", "item", "journal", "maintain", "normal",
+        "obtain", "participate", "perceive", "positive", "potential",
+        "previous", "primary", "purchase", "range", "region", "regulate",
+        "relevant", "reside", "resource", "restrict", "secure", "seek",
+        "select", "site", "strategy", "survey", "text", "tradition",
+        "transfer"],
+    3: ["alternative", "circumstance", "comment", "compensate", "component",
+        "consent", "considerable", "constant", "constrain", "contribute",
+        "convene", "coordinate", "core", "corporate", "correspond", "criteria",
+        "deduce", "demonstrate", "document", "dominate", "emphasis", "ensure",
+        "exclude", "framework", "fund", "illustrate", "immigrate", "imply",
+        "initial", "instance", "interact", "justify", "layer", "link",
+        "locate", "maximise", "minor", "negate", "outcome", "partner",
+        "philosophy", "physical", "proportion", "publish", "react", "register",
+        "rely", "remove", "scheme", "sequence", "sex", "shift", "specify",
+        "sufficient", "task", "technical", "technique", "technology", "valid",
+        "volume"],
+    4: ["access", "adequate", "annual", "apparent", "approximate", "attitude",
+        "attribute", "civil", "code", "commit", "communicate", "concentrate",
+        "confer", "contrast", "cycle", "debate", "despite", "dimension",
+        "domestic", "emerge", "error", "ethnic", "goal", "grant", "hence",
+        "hypothesis", "implement", "implicate", "impose", "integrate",
+        "internal", "investigate", "job", "label", "mechanism", "obvious",
+        "occupy", "option", "output", "overall", "parallel", "parameter",
+        "phase", "predict", "principal", "prior", "professional", "project",
+        "promote", "regime", "resolve", "retain", "series", "statistic",
+        "status", "stress", "subsequent", "sum", "summary", "undertake"],
+    5: ["academy", "adjust", "alter", "amend", "aware", "capacity",
+        "challenge", "clause", "compound", "conflict", "consult", "contact",
+        "decline", "discrete", "draft", "enable", "energy", "enforce",
+        "entity", "equivalent", "evolve", "expand", "expose", "external",
+        "facilitate", "fundamental", "generate", "generation", "image",
+        "liberal", "licence", "logic", "margin", "medical", "mental",
+        "modify", "monitor", "network", "notion", "objective", "orient",
+        "perspective", "precise", "prime", "psychology", "pursue", "ratio",
+        "reject", "revenue", "stable", "style", "substitute", "sustain",
+        "symbol", "target", "transit", "trend", "version", "welfare",
+        "whereas"],
+    6: ["abstract", "accurate", "acknowledge", "aggregate", "allocate",
+        "assign", "attach", "author", "bond", "brief", "capable", "cite",
+        "cooperate", "discriminate", "display", "diverse", "domain", "edit",
+        "enhance", "estate", "exceed", "expert", "explicit", "federal", "fee",
+        "flexible", "furthermore", "gender", "ignorant", "incentive",
+        "incidence", "incorporate", "index", "inhibit", "initiate", "input",
+        "instruct", "intelligent", "interval", "lecture", "migrate", "minimum",
+        "ministry", "motive", "neutral", "nevertheless", "overseas", "precede",
+        "presume", "rational", "recover", "reveal", "scope", "subsidy", "tape",
+        "trace", "transform", "transport", "underlie", "utilise"],
+    7: ["adapt", "adult", "advocate", "aid", "channel", "chemical", "classic",
+        "comprehensive", "comprise", "confirm", "contrary", "convert",
+        "couple", "decade", "definite", "deny", "differentiate", "dispose",
+        "dynamic", "eliminate", "empirical", "equip", "extract", "file",
+        "finite", "foundation", "globe", "grade", "guarantee", "hierarchy",
+        "identical", "ideology", "infer", "innovate", "insert", "intervene",
+        "isolate", "media", "mode", "paradigm", "phenomenon", "priority",
+        "prohibit", "publication", "quote", "release", "reverse", "simulate",
+        "sole", "somewhat", "submit", "successor", "survive", "thesis",
+        "topic", "transmit", "ultimate", "unique", "visible", "voluntary"],
+    8: ["abandon", "accompany", "accumulate", "ambiguous", "append",
+        "appreciate", "arbitrary", "automate", "bias", "chart", "clarify",
+        "commodity", "complement", "conform", "contemporary", "contradict",
+        "crucial", "currency", "denote", "detect", "deviate", "displace",
+        "drama", "eventual", "exhibit", "exploit", "fluctuate", "guideline",
+        "highlight", "implicit", "induce", "inevitable", "infrastructure",
+        "inspect", "intense", "manipulate", "minimise", "nuclear", "offset",
+        "paragraph", "plus", "practitioner", "predominant", "prospect",
+        "radical", "random", "reinforce", "restore", "revise", "schedule",
+        "tense", "terminate", "theme", "thereby", "uniform", "vehicle", "via",
+        "virtual", "visual", "widespread"],
+    9: ["accommodate", "analogy", "anticipate", "assure", "attain", "behalf",
+        "bulk", "cease", "coherent", "coincide", "commence", "compatible",
+        "concurrent", "confine", "controversy", "converse", "device", "devote",
+        "diminish", "distort", "duration", "erode", "ethic", "format", "found",
+        "inherent", "insight", "integral", "intermediate", "manual", "mature",
+        "mediate", "medium", "military", "minimal", "mutual", "norm",
+        "overlap", "passive", "portion", "preliminary", "protocol",
+        "qualitative", "refine", "relax", "restrain", "revolution", "rigid",
+        "route", "scenario", "sphere", "subordinate", "supplement", "suspend",
+        "team", "temporary", "trigger", "unify", "violate", "vision"],
+    10: ["adjacent", "albeit", "assemble", "collapse", "colleague", "compile",
+         "conceive", "convince", "depress", "encounter", "enormous",
+         "forthcoming", "incline", "integrity", "intrinsic", "invoke", "levy",
+         "likewise", "nonetheless", "notwithstanding", "odd", "ongoing",
+         "panel", "persist", "pose", "reluctance", "so-called",
+         "straightforward", "undergo", "whereby"],
+}
+
+# ============================================================
+# Build AWL lookup: word -> sublist (including common derivatives)
+# ============================================================
+def build_awl_lookup():
+    """Build a comprehensive AWL word->sublist lookup with common derivatives."""
+    lookup = {}
+
+    # Headwords
+    for sl, words in AWL_SUBLISTS.items():
+        for w in words:
+            lookup[w.lower()] = sl
+
+    # Add common derivative suffixes for each headword
+    derivative_map = {
+        # Sublist 1
+        "analyse": ["analyze", "analysis", "analyst", "analytic", "analytical", "analyzing", "analysing", "analyses", "analysed", "analyzed"],
+        "approach": ["approaches", "approached", "approaching"],
+        "assess": ["assesses", "assessed", "assessing", "assessment", "assessments"],
+        "assume": ["assumes", "assumed", "assuming", "assumption", "assumptions"],
+        "authority": ["authorities", "authoritative"],
+        "available": ["availability", "unavailable"],
+        "benefit": ["benefits", "benefited", "benefiting", "beneficial"],
+        "concept": ["concepts", "conception", "conceptual", "conceptualize"],
+        "consist": ["consists", "consisted", "consisting", "consistency", "consistent", "consistently"],
+        "constitute": ["constitutes", "constituted", "constituting", "constitution", "constitutional", "constitutionally"],
+        "context": ["contexts", "contextual", "contextualize", "contextualised"],
+        "contract": ["contracts", "contracted", "contracting", "contractor", "contractors"],
+        "create": ["creates", "created", "creating", "creation", "creations", "creative", "creatively", "creativity", "creator"],
+        "define": ["defines", "defined", "defining", "definition", "definitions", "definitive", "redefine", "redefines", "undefined"],
+        "derive": ["derives", "derived", "deriving", "derivation", "derivative", "derivatives"],
+        "distribute": ["distributes", "distributed", "distributing", "distribution", "distributions", "distributor"],
+        "economy": ["economies", "economic", "economical", "economically", "economics", "economist"],
+        "environment": ["environments", "environmental", "environmentally"],
+        "establish": ["establishes", "established", "establishing", "establishment", "establishments"],
+        "estimate": ["estimates", "estimated", "estimating", "estimation", "estimations", "overestimate", "underestimate"],
+        "evident": ["evidence", "evidenced", "evidently"],
+        "export": ["exports", "exported", "exporting", "exporter"],
+        "factor": ["factors", "factored", "factoring"],
+        "finance": ["finances", "financed", "financing", "financial", "financially", "financier"],
+        "formula": ["formulae", "formulas", "formulate", "formulated", "formulating", "formulation"],
+        "function": ["functions", "functioned", "functioning", "functional", "functionally"],
+        "identify": ["identifies", "identified", "identifying", "identification", "identifiable", "identity", "identities"],
+        "income": ["incomes"],
+        "indicate": ["indicates", "indicated", "indicating", "indication", "indications", "indicator", "indicators", "indicative"],
+        "individual": ["individuals", "individuality", "individually", "individualistic"],
+        "interpret": ["interprets", "interpreted", "interpreting", "interpretation", "interpretations", "interpretive", "reinterpret"],
+        "involve": ["involves", "involved", "involving", "involvement"],
+        "issue": ["issues", "issued", "issuing"],
+        "labour": ["labours", "laboured", "labouring", "labor", "labors", "labored", "laboring"],
+        "legal": ["legally", "illegal", "illegally", "legality"],
+        "legislate": ["legislates", "legislated", "legislating", "legislation", "legislative", "legislator", "legislature"],
+        "major": ["majors", "majority", "majorities"],
+        "method": ["methods", "methodical", "methodology", "methodologies"],
+        "occur": ["occurs", "occurred", "occurring", "occurrence", "occurrences", "reoccur"],
+        "percent": ["percentage", "percentages"],
+        "period": ["periods", "periodic", "periodical", "periodically"],
+        "policy": ["policies"],
+        "principle": ["principles", "principled", "unprincipled"],
+        "proceed": ["proceeds", "proceeded", "proceeding", "proceedings", "procedure", "procedures", "procedural"],
+        "process": ["processes", "processed", "processing"],
+        "require": ["requires", "required", "requiring", "requirement", "requirements"],
+        "research": ["researches", "researched", "researching", "researcher", "researchers"],
+        "respond": ["responds", "responded", "responding", "response", "responses", "responsive", "unresponsive"],
+        "role": ["roles"],
+        "section": ["sections", "sectioned", "sectioning", "sector", "sectors"],
+        "significant": ["significance", "significantly", "insignificant"],
+        "similar": ["similarly", "similarity", "similarities"],
+        "source": ["sources", "sourced", "sourcing"],
+        "specific": ["specifically", "specification", "specifications", "specificity"],
+        "structure": ["structures", "structured", "structuring", "structural", "structurally", "restructure", "restructured"],
+        "theory": ["theories", "theoretical", "theoretically", "theorist"],
+        "vary": ["varies", "varied", "varying", "variable", "variables", "variability", "variation", "variations", "variety", "various", "invariable", "invariably"],
+
+        # Sublist 2 (key derivatives for common TOEFL words)
+        "achieve": ["achieves", "achieved", "achieving", "achievement", "achievable"],
+        "acquire": ["acquires", "acquired", "acquiring", "acquisition", "acquisitions"],
+        "affect": ["affects", "affected", "affecting", "affection", "affective", "unaffected"],
+        "appropriate": ["appropriately", "inappropriate", "appropriateness"],
+        "aspect": ["aspects"],
+        "assist": ["assists", "assisted", "assisting", "assistance", "assistant"],
+        "category": ["categories", "categorize", "categorization"],
+        "commission": ["commissions", "commissioned", "commissioning"],
+        "community": ["communities"],
+        "complex": ["complexity", "complexities"],
+        "compute": ["computes", "computed", "computing", "computer", "computers", "computation", "computational"],
+        "conclude": ["concludes", "concluded", "concluding", "conclusion", "conclusions", "conclusive", "inconclusive"],
+        "conduct": ["conducts", "conducted", "conducting"],
+        "consequent": ["consequence", "consequences", "consequently"],
+        "construct": ["constructs", "constructed", "constructing", "construction", "constructions", "constructive", "reconstruct"],
+        "consume": ["consumes", "consumed", "consuming", "consumer", "consumers", "consumption"],
+        "credit": ["credits", "credited", "crediting", "creditor", "credible", "incredible", "credibility"],
+        "culture": ["cultures", "cultural", "culturally"],
+        "design": ["designs", "designed", "designing", "designer"],
+        "distinct": ["distinctly", "distinction", "distinctive", "distinctively", "indistinct"],
+        "element": ["elements", "elementary"],
+        "evaluate": ["evaluates", "evaluated", "evaluating", "evaluation", "evaluations", "evaluative", "reevaluate"],
+        "feature": ["features", "featured", "featuring"],
+        "focus": ["focuses", "focused", "focusing", "focussed", "focussing", "refocus"],
+        "impact": ["impacts", "impacted", "impacting"],
+        "institute": ["institutes", "instituted", "instituting", "institution", "institutional", "institutionally"],
+        "invest": ["invests", "invested", "investing", "investment", "investments", "investor"],
+        "maintain": ["maintains", "maintained", "maintaining", "maintenance"],
+        "normal": ["normally", "abnormal", "abnormally", "normality"],
+        "obtain": ["obtains", "obtained", "obtaining", "obtainable"],
+        "participate": ["participates", "participated", "participating", "participation", "participant", "participants"],
+        "perceive": ["perceives", "perceived", "perceiving", "perception", "perceptions", "perceptive"],
+        "positive": ["positively", "positivity"],
+        "potential": ["potentially"],
+        "previous": ["previously"],
+        "primary": ["primarily"],
+        "purchase": ["purchases", "purchased", "purchasing", "purchaser"],
+        "range": ["ranges", "ranged", "ranging"],
+        "region": ["regions", "regional", "regionally"],
+        "regulate": ["regulates", "regulated", "regulating", "regulation", "regulations", "regulatory", "deregulate"],
+        "relevant": ["relevance", "irrelevant", "relevancy"],
+        "reside": ["resides", "resided", "residing", "residence", "residences", "resident", "residential"],
+        "resource": ["resources", "resourceful", "resourcefulness"],
+        "restrict": ["restricts", "restricted", "restricting", "restriction", "restrictions", "restrictive"],
+        "secure": ["secures", "secured", "securing", "security", "insecure", "insecurity"],
+        "seek": ["seeks", "sought", "seeking"],
+        "select": ["selects", "selected", "selecting", "selection", "selections", "selective", "selectively"],
+        "strategy": ["strategies", "strategic", "strategically"],
+        "survey": ["surveys", "surveyed", "surveying"],
+        "tradition": ["traditions", "traditional", "traditionally", "nontraditional"],
+        "transfer": ["transfers", "transferred", "transferring", "transferable"],
+
+        # Sublist 3 key derivatives
+        "alternative": ["alternatively", "alternatives"],
+        "circumstance": ["circumstances"],
+        "comment": ["comments", "commented", "commenting", "commentary", "commentaries", "commentator"],
+        "compensate": ["compensates", "compensated", "compensating", "compensation", "compensatory"],
+        "component": ["components"],
+        "considerable": ["considerably"],
+        "constant": ["constantly", "constancy", "inconstant"],
+        "constrain": ["constrains", "constrained", "constraining", "constraint", "constraints", "unconstrained"],
+        "contribute": ["contributes", "contributed", "contributing", "contribution", "contributions", "contributor"],
+        "coordinate": ["coordinates", "coordinated", "coordinating", "coordination", "coordinator"],
+        "core": ["cores", "coring"],
+        "corporate": ["corporately", "corporation", "corporations"],
+        "correspond": ["corresponds", "corresponded", "corresponding", "correspondence", "correspondent"],
+        "demonstrate": ["demonstrates", "demonstrated", "demonstrating", "demonstration", "demonstrations", "demonstrative", "demonstrator"],
+        "document": ["documents", "documented", "documenting", "documentation"],
+        "dominate": ["dominates", "dominated", "dominating", "domination", "dominant", "dominance"],
+        "emphasis": ["emphasize", "emphasized", "emphasizing", "emphatic", "emphatically"],
+        "ensure": ["ensures", "ensured", "ensuring"],
+        "exclude": ["excludes", "excluded", "excluding", "exclusion", "exclusionary", "exclusive", "exclusively"],
+        "framework": ["frameworks"],
+        "fund": ["funds", "funded", "funding"],
+        "illustrate": ["illustrates", "illustrated", "illustrating", "illustration", "illustrations", "illustrative"],
+        "imply": ["implies", "implied", "implying", "implication", "implications"],
+        "initial": ["initially", "initiate", "initiated", "initiating", "initiation", "initiative"],
+        "interact": ["interacts", "interacted", "interacting", "interaction", "interactions", "interactive"],
+        "justify": ["justifies", "justified", "justifying", "justification", "justifiable", "unjustified"],
+        "layer": ["layers", "layered", "layering"],
+        "link": ["links", "linked", "linking", "linkage", "linkages"],
+        "locate": ["locates", "located", "locating", "location", "locations", "relocate", "relocated"],
+        "minor": ["minors", "minority", "minorities"],
+        "outcome": ["outcomes"],
+        "partner": ["partners", "partnered", "partnering", "partnership"],
+        "philosophy": ["philosophies", "philosopher", "philosophical", "philosophically"],
+        "physical": ["physically"],
+        "proportion": ["proportions", "proportional", "proportionally", "disproportionate"],
+        "publish": ["publishes", "published", "publishing", "publication", "publications", "publisher"],
+        "react": ["reacts", "reacted", "reacting", "reaction", "reactions", "reactive", "reactor"],
+        "register": ["registers", "registered", "registering", "registration"],
+        "rely": ["relies", "relied", "relying", "reliable", "reliability", "reliance", "unreliable"],
+        "remove": ["removes", "removed", "removing", "removal", "removable"],
+        "scheme": ["schemes", "schemed", "scheming"],
+        "sequence": ["sequences", "sequenced", "sequencing", "sequential", "sequentially"],
+        "shift": ["shifts", "shifted", "shifting"],
+        "specify": ["specifies", "specified", "specifying", "specification", "specifications", "specific", "specifically"],
+        "sufficient": ["sufficiently", "insufficient", "sufficiency"],
+        "task": ["tasks", "tasked", "tasking"],
+        "technical": ["technically", "technicality"],
+        "technique": ["techniques"],
+        "technology": ["technologies", "technological", "technologically"],
+        "valid": ["validity", "invalid", "validate", "validated", "validating", "validation"],
+        "volume": ["volumes"],
+
+        # Sublist 4 key derivatives
+        "access": ["accesses", "accessed", "accessing", "accessible", "inaccessible", "accessibility"],
+        "adequate": ["adequately", "adequacy", "inadequate", "inadequately"],
+        "annual": ["annually"],
+        "apparent": ["apparently"],
+        "approximate": ["approximately", "approximated", "approximating", "approximation"],
+        "attitude": ["attitudes"],
+        "attribute": ["attributes", "attributed", "attributing", "attribution", "attributable"],
+        "civil": ["civilian", "civility", "civilize", "civilization", "uncivil"],
+        "code": ["codes", "coded", "coding"],
+        "commit": ["commits", "committed", "committing", "commitment", "commitments"],
+        "communicate": ["communicates", "communicated", "communicating", "communication", "communicative"],
+        "concentrate": ["concentrates", "concentrated", "concentrating", "concentration"],
+        "contrast": ["contrasts", "contrasted", "contrasting"],
+        "cycle": ["cycles", "cycled", "cycling", "cyclical"],
+        "debate": ["debates", "debated", "debating"],
+        "despite": ["despites"],
+        "dimension": ["dimensions", "dimensional", "multidimensional"],
+        "domestic": ["domestically", "domesticate", "domesticated"],
+        "emerge": ["emerges", "emerged", "emerging", "emergence", "emergent", "emergency"],
+        "error": ["errors", "erroneous", "erroneously"],
+        "ethnic": ["ethnically", "ethnicity"],
+        "goal": ["goals"],
+        "grant": ["grants", "granted", "granting"],
+        "hypothesis": ["hypotheses", "hypothesize", "hypothetical", "hypothetically"],
+        "implement": ["implements", "implemented", "implementing", "implementation"],
+        "impose": ["imposes", "imposed", "imposing", "imposition"],
+        "integrate": ["integrates", "integrated", "integrating", "integration", "integral"],
+        "internal": ["internally", "internalize", "external"],
+        "investigate": ["investigates", "investigated", "investigating", "investigation", "investigator"],
+        "label": ["labels", "labelled", "labelling", "labeled", "labeling"],
+        "mechanism": ["mechanisms"],
+        "obvious": ["obviously"],
+        "occupy": ["occupies", "occupied", "occupying", "occupation", "occupational", "occupant"],
+        "option": ["options", "optional"],
+        "output": ["outputs", "outputted", "outputting"],
+        "overall": ["overalls"],
+        "parallel": ["paralleled", "paralleling", "unparalleled"],
+        "parameter": ["parameters"],
+        "phase": ["phases", "phased", "phasing"],
+        "predict": ["predicts", "predicted", "predicting", "prediction", "predictions", "predictable", "unpredictable"],
+        "principal": ["principally"],
+        "prior": ["priors", "prioritize", "prioritized", "prioritizing", "priority", "priorities"],
+        "professional": ["professionally", "professionalism"],
+        "project": ["projects", "projected", "projecting", "projection", "projections"],
+        "promote": ["promotes", "promoted", "promoting", "promotion", "promotions", "promoter"],
+        "resolve": ["resolves", "resolved", "resolving", "resolution", "unresolved"],
+        "retain": ["retains", "retained", "retaining", "retention", "retentive"],
+        "series": ["serials"],
+        "status": ["statuses"],
+        "stress": ["stresses", "stressed", "stressing", "stressful"],
+        "subsequent": ["subsequently"],
+        "sum": ["sums", "summed", "summing", "summation"],
+        "summary": ["summaries", "summarize", "summarized", "summarizing", "summarisation"],
+        "undertake": ["undertakes", "undertook", "undertaken", "undertaking"],
+
+        # Sublist 5 key derivatives
+        "academy": ["academies", "academic", "academically", "academician"],
+        "adjust": ["adjusts", "adjusted", "adjusting", "adjustment", "adjustments"],
+        "alter": ["alters", "altered", "altering", "alteration", "alterations", "unaltered", "alternate", "alternative"],
+        "aware": ["awareness", "unaware"],
+        "capacity": ["capacities", "incapacitate"],
+        "challenge": ["challenges", "challenged", "challenging", "challenger"],
+        "clause": ["clauses"],
+        "compound": ["compounds", "compounded", "compounding"],
+        "conflict": ["conflicts", "conflicted", "conflicting"],
+        "consult": ["consults", "consulted", "consulting", "consultation", "consultant", "consultancy"],
+        "contact": ["contacts", "contacted", "contacting"],
+        "decline": ["declines", "declined", "declining"],
+        "draft": ["drafts", "drafted", "drafting"],
+        "enable": ["enables", "enabled", "enabling"],
+        "energy": ["energies", "energetic", "energetically"],
+        "enforce": ["enforces", "enforced", "enforcing", "enforcement"],
+        "entity": ["entities"],
+        "equivalent": ["equivalently", "equivalence"],
+        "evolve": ["evolves", "evolved", "evolving", "evolution", "evolutionary"],
+        "expand": ["expands", "expanded", "expanding", "expansion", "expansionism", "expansive"],
+        "expose": ["exposes", "exposed", "exposing", "exposure", "exposures"],
+        "external": ["externally", "externalize"],
+        "facilitate": ["facilitates", "facilitated", "facilitating", "facilitation", "facilitator"],
+        "generate": ["generates", "generated", "generating", "generation"],
+        "image": ["images", "imagery", "imaging"],
+        "liberal": ["liberally", "liberalize", "liberalism", "liberation", "liberate", "liberated"],
+        "logic": ["logical", "logically", "illogical", "logician"],
+        "margin": ["margins", "marginal", "marginally"],
+        "medical": ["medically", "medication", "medicine"],
+        "mental": ["mentally", "mentality"],
+        "modify": ["modifies", "modified", "modifying", "modification", "modifications"],
+        "monitor": ["monitors", "monitored", "monitoring"],
+        "network": ["networks", "networked", "networking"],
+        "notion": ["notions"],
+        "objective": ["objectively", "objectivity"],
+        "orient": ["orients", "oriented", "orienting", "orientation", "reorient"],
+        "perspective": ["perspectives"],
+        "precise": ["precisely", "precision", "imprecise"],
+        "prime": ["primes", "primed", "priming", "primary", "primarily"],
+        "psychology": ["psychologies", "psychological", "psychologically", "psychologist"],
+        "pursue": ["pursues", "pursued", "pursuing", "pursuit", "pursuits"],
+        "ratio": ["ratios"],
+        "reject": ["rejects", "rejected", "rejecting", "rejection", "rejections"],
+        "revenue": ["revenues"],
+        "stable": ["stably", "stability", "stabilize", "stabilized", "instability", "unstable"],
+        "style": ["styles", "styled", "styling", "stylish", "stylistic", "stylize"],
+        "substitute": ["substitutes", "substituted", "substituting", "substitution"],
+        "sustain": ["sustains", "sustained", "sustaining", "sustainable", "sustainability", "unsustainable"],
+        "symbol": ["symbols", "symbolic", "symbolically", "symbolize", "symbolism"],
+        "target": ["targets", "targeted", "targeting"],
+        "transit": ["transits", "transited", "transiting", "transition", "transitions", "transitional"],
+        "trend": ["trends", "trendy"],
+        "version": ["versions"],
+        "welfare": ["welfares"],
+        "whereas": [],
+
+        # Sublist 6 key derivatives
+        "abstract": ["abstracts", "abstracted", "abstracting", "abstraction", "abstractions", "abstractly"],
+        "accurate": ["accurately", "accuracy", "inaccurate", "inaccuracy"],
+        "acknowledge": ["acknowledges", "acknowledged", "acknowledging", "acknowledgement"],
+        "aggregate": ["aggregates", "aggregated", "aggregating", "aggregation"],
+        "allocate": ["allocates", "allocated", "allocating", "allocation"],
+        "assign": ["assigns", "assigned", "assigning", "assignment", "assignments"],
+        "attach": ["attaches", "attached", "attaching", "attachment", "unattached"],
+        "author": ["authors", "authored", "authoring", "authorship"],
+        "bond": ["bonds", "bonded", "bonding"],
+        "brief": ["briefs", "briefly", "briefed", "briefing"],
+        "capable": ["capably", "capability", "capabilities", "incapable"],
+        "cite": ["cites", "cited", "citing", "citation", "citations"],
+        "cooperate": ["cooperates", "cooperated", "cooperating", "cooperation", "cooperative", "cooperatively"],
+        "display": ["displays", "displayed", "displaying"],
+        "diverse": ["diversely", "diversity", "diversify", "diversification"],
+        "domain": ["domains"],
+        "edit": ["edits", "edited", "editing", "edition", "editions", "editor", "editorial"],
+        "enhance": ["enhances", "enhanced", "enhancing", "enhancement", "enhancements"],
+        "estate": ["estates"],
+        "exceed": ["exceeds", "exceeded", "exceeding", "exceedingly", "excessive", "excessively"],
+        "expert": ["experts", "expertly", "expertise"],
+        "explicit": ["explicitly", "explicitness"],
+        "federal": ["federally", "federation", "federalism"],
+        "flexible": ["flexibly", "flexibility", "inflexible", "inflexibility"],
+        "gender": ["genders", "gendered"],
+        "ignorant": ["ignorantly", "ignorance", "ignore", "ignored", "ignoring"],
+        "incentive": ["incentives"],
+        "incorporate": ["incorporates", "incorporated", "incorporating", "incorporation"],
+        "index": ["indexes", "indices", "indexed", "indexing"],
+        "inhibit": ["inhibits", "inhibited", "inhibiting", "inhibition", "inhibitor"],
+        "initiate": ["initiates", "initiated", "initiating", "initiation", "initiative", "initiator"],
+        "input": ["inputs", "inputted", "inputting"],
+        "instruct": ["instructs", "instructed", "instructing", "instruction", "instructions", "instructor", "instructive"],
+        "intelligent": ["intelligently", "intelligence", "unintelligent"],
+        "interval": ["intervals"],
+        "lecture": ["lectures", "lectured", "lecturing", "lecturer"],
+        "migrate": ["migrates", "migrated", "migrating", "migration", "migrant", "migratory", "immigrate", "immigration"],
+        "minimum": ["minimums", "minimal", "minimally", "minimize", "minimized"],
+        "motive": ["motives", "motivate", "motivated", "motivating", "motivation"],
+        "neutral": ["neutrally", "neutrality", "neutralize"],
+        "overseas": [],
+        "precede": ["precedes", "preceded", "preceding", "precedence", "precedent", "precedents", "unprecedented"],
+        "presume": ["presumes", "presumed", "presuming", "presumption", "presumably"],
+        "rational": ["rationally", "rationale", "rationalize", "rationality", "irrational"],
+        "recover": ["recovers", "recovered", "recovering", "recovery", "recoverable"],
+        "reveal": ["reveals", "revealed", "revealing", "revelation", "revelations"],
+        "scope": ["scopes"],
+        "transform": ["transforms", "transformed", "transforming", "transformation", "transformations"],
+        "transport": ["transports", "transported", "transporting", "transportation"],
+        "underlie": ["underlies", "underlay", "underlain", "underlying"],
+        "utilise": ["utilises", "utilised", "utilising", "utilize", "utilized", "utilizing", "utilization", "utility", "utilities"],
+
+        # Sublist 7 key derivatives
+        "adapt": ["adapts", "adapted", "adapting", "adaptation", "adaptable", "adaptability", "adaptive"],
+        "adult": ["adults", "adulthood"],
+        "advocate": ["advocates", "advocated", "advocating", "advocacy"],
+        "channel": ["channels", "channelled", "channelling"],
+        "chemical": ["chemicals", "chemically", "chemistry", "chemist"],
+        "classic": ["classics", "classical", "classically"],
+        "comprehensive": ["comprehensively", "comprehend", "comprehension"],
+        "comprise": ["comprises", "comprised", "comprising"],
+        "confirm": ["confirms", "confirmed", "confirming", "confirmation"],
+        "contrary": ["contrarily"],
+        "convert": ["converts", "converted", "converting", "conversion", "convertible"],
+        "decade": ["decades"],
+        "definite": ["definitely", "definition", "indefinite", "indefinitely"],
+        "deny": ["denies", "denied", "denying", "denial"],
+        "differentiate": ["differentiates", "differentiated", "differentiating", "differentiation"],
+        "dispose": ["disposes", "disposed", "disposing", "disposal", "disposable"],
+        "dynamic": ["dynamically", "dynamics"],
+        "eliminate": ["eliminates", "eliminated", "eliminating", "elimination"],
+        "empirical": ["empirically", "empiricism"],
+        "equip": ["equips", "equipped", "equipping", "equipment"],
+        "extract": ["extracts", "extracted", "extracting", "extraction"],
+        "file": ["files", "filed", "filing"],
+        "finite": ["finitely", "infinite", "infinitely", "infinity"],
+        "foundation": ["foundations", "found", "founded", "founding", "founder"],
+        "globe": ["globes", "global", "globally", "globalize", "globalization"],
+        "grade": ["grades", "graded", "grading"],
+        "guarantee": ["guarantees", "guaranteed", "guaranteeing"],
+        "hierarchy": ["hierarchies", "hierarchical", "hierarchically"],
+        "identical": ["identically"],
+        "ideology": ["ideologies", "ideological", "ideologically"],
+        "infer": ["infers", "inferred", "inferring", "inference", "inferences"],
+        "innovate": ["innovates", "innovated", "innovating", "innovation", "innovative", "innovator"],
+        "insert": ["inserts", "inserted", "inserting", "insertion"],
+        "intervene": ["intervenes", "intervened", "intervening", "intervention"],
+        "isolate": ["isolates", "isolated", "isolating", "isolation", "isolatedly"],
+        "media": ["medium"],
+        "mode": ["modes", "modal"],
+        "paradigm": ["paradigms", "paradigmatic"],
+        "phenomenon": ["phenomena", "phenomenal"],
+        "priority": ["priorities", "prioritize", "prioritization"],
+        "prohibit": ["prohibits", "prohibited", "prohibiting", "prohibition", "prohibitive"],
+        "publication": ["publications", "publish"],
+        "quote": ["quotes", "quoted", "quoting", "quotation", "quotations"],
+        "release": ["releases", "released", "releasing"],
+        "reverse": ["reverses", "reversed", "reversing", "reversal", "reversible", "irreversible"],
+        "simulate": ["simulates", "simulated", "simulating", "simulation"],
+        "sole": ["solely"],
+        "submit": ["submits", "submitted", "submitting", "submission", "submissions"],
+        "successor": ["successors", "succession", "successive", "successively"],
+        "survive": ["survives", "survived", "surviving", "survival", "survivor"],
+        "thesis": ["theses"],
+        "topic": ["topics", "topical"],
+        "transmit": ["transmits", "transmitted", "transmitting", "transmission", "transmissions"],
+        "ultimate": ["ultimately"],
+        "unique": ["uniquely", "uniqueness"],
+        "visible": ["visibly", "visibility", "invisible"],
+        "voluntary": ["voluntarily", "volunteer", "volunteers"],
+
+        # Sublist 8 key derivatives
+        "abandon": ["abandons", "abandoned", "abandoning", "abandonment"],
+        "accompany": ["accompanies", "accompanied", "accompanying", "accompaniment"],
+        "accumulate": ["accumulates", "accumulated", "accumulating", "accumulation"],
+        "ambiguous": ["ambiguously", "ambiguity", "unambiguous"],
+        "appreciate": ["appreciates", "appreciated", "appreciating", "appreciation", "appreciative", "unappreciated"],
+        "arbitrary": ["arbitrarily", "arbitrariness"],
+        "automate": ["automates", "automated", "automating", "automation", "automatic", "automatically"],
+        "bias": ["biases", "biased", "biasing", "unbiased"],
+        "chart": ["charts", "charted", "charting"],
+        "clarify": ["clarifies", "clarified", "clarifying", "clarification"],
+        "commodity": ["commodities"],
+        "complement": ["complements", "complemented", "complementing", "complementary"],
+        "conform": ["conforms", "conformed", "conforming", "conformity", "conformist", "nonconformist"],
+        "contradict": ["contradicts", "contradicted", "contradicting", "contradiction", "contradictory"],
+        "crucial": ["crucially"],
+        "currency": ["currencies"],
+        "denote": ["denotes", "denoted", "denoting", "denotation"],
+        "detect": ["detects", "detected", "detecting", "detection", "detective", "detector"],
+        "deviate": ["deviates", "deviated", "deviating", "deviation", "deviant"],
+        "displace": ["displaces", "displaced", "displacing", "displacement"],
+        "drama": ["dramas", "dramatic", "dramatically", "dramatize"],
+        "eventual": ["eventually", "eventuality"],
+        "exhibit": ["exhibits", "exhibited", "exhibiting", "exhibition"],
+        "exploit": ["exploits", "exploited", "exploiting", "exploitation"],
+        "fluctuate": ["fluctuates", "fluctuated", "fluctuating", "fluctuation"],
+        "guideline": ["guidelines"],
+        "highlight": ["highlights", "highlighted", "highlighting"],
+        "implicit": ["implicitly", "implicitness"],
+        "induce": ["induces", "induced", "inducing", "inducement", "induction"],
+        "inevitable": ["inevitably", "inevitability"],
+        "infrastructure": ["infrastructures"],
+        "inspect": ["inspects", "inspected", "inspecting", "inspection", "inspector"],
+        "intense": ["intensely", "intensify", "intensified", "intensity", "intensive", "intensively"],
+        "manipulate": ["manipulates", "manipulated", "manipulating", "manipulation", "manipulative"],
+        "minimise": ["minimises", "minimised", "minimising", "minimize", "minimized", "minimizing", "minimum", "minimal"],
+        "nuclear": ["nucleus", "nuclei"],
+        "offset": ["offsets", "offsetting"],
+        "paragraph": ["paragraphs"],
+        "predominant": ["predominantly", "predominate", "predominance"],
+        "prospect": ["prospects", "prospective", "prospector"],
+        "radical": ["radically", "radicals", "radicalism"],
+        "random": ["randomly", "randomness", "randomize"],
+        "reinforce": ["reinforces", "reinforced", "reinforcing", "reinforcement"],
+        "restore": ["restores", "restored", "restoring", "restoration"],
+        "revise": ["revises", "revised", "revising", "revision", "revisions"],
+        "schedule": ["schedules", "scheduled", "scheduling", "reschedule"],
+        "tense": ["tenser", "tensest", "tension", "tensions"],
+        "terminate": ["terminates", "terminated", "terminating", "termination", "terminal"],
+        "theme": ["themes", "thematic", "thematically"],
+        "thereby": [],
+        "uniform": ["uniformly", "uniformity"],
+        "vehicle": ["vehicles"],
+        "via": [],
+        "virtual": ["virtually"],
+        "visual": ["visually", "visualize", "visualization", "visualized"],
+        "widespread": [],
+
+        # Sublist 9 key derivatives
+        "accommodate": ["accommodates", "accommodated", "accommodating", "accommodation"],
+        "analogy": ["analogies", "analogous"],
+        "anticipate": ["anticipates", "anticipated", "anticipating", "anticipation"],
+        "assure": ["assures", "assured", "assuring", "assurance", "reassure", "reassurance"],
+        "attain": ["attains", "attained", "attaining", "attainment", "attainable"],
+        "behalf": [],
+        "bulk": ["bulks", "bulky"],
+        "cease": ["ceases", "ceased", "ceasing", "ceaseless", "cessation"],
+        "coherent": ["coherently", "coherence", "coherently", "incoherent"],
+        "coincide": ["coincides", "coincided", "coinciding", "coincidence", "coincidental"],
+        "commence": ["commences", "commenced", "commencing", "commencement"],
+        "compatible": ["compatibly", "compatibility", "incompatible"],
+        "concurrent": ["concurrently", "concurrency"],
+        "confine": ["confines", "confined", "confining", "confinement"],
+        "controversy": ["controversies", "controversial"],
+        "converse": ["converses", "conversed", "conversing", "conversation", "conversational"],
+        "device": ["devices"],
+        "devote": ["devotes", "devoted", "devoting", "devotion", "devotee"],
+        "diminish": ["diminishes", "diminished", "diminishing", "diminution"],
+        "distort": ["distorts", "distorted", "distorting", "distortion"],
+        "duration": ["durations"],
+        "erode": ["erodes", "eroded", "eroding", "erosion"],
+        "ethic": ["ethics", "ethical", "ethically", "unethical"],
+        "format": ["formats", "formatted", "formatting"],
+        "found": ["founds", "founded", "founding", "foundation", "founder"],
+        "inherent": ["inherently"],
+        "insight": ["insights", "insightful"],
+        "integral": ["integrally"],
+        "intermediate": ["intermediates", "intermediation"],
+        "manual": ["manuals", "manually"],
+        "mature": ["matures", "matured", "maturing", "maturity", "immature", "immaturity"],
+        "mediate": ["mediates", "mediated", "mediating", "mediation", "mediator"],
+        "medium": ["mediums", "media"],
+        "military": ["militarily", "militarism"],
+        "minimal": ["minimally", "minimize"],
+        "mutual": ["mutually"],
+        "norm": ["norms", "normal", "normally", "abnormal"],
+        "overlap": ["overlaps", "overlapped", "overlapping"],
+        "passive": ["passively", "passivity"],
+        "portion": ["portions", "portioned", "portioning"],
+        "preliminary": ["preliminaries"],
+        "protocol": ["protocols"],
+        "refine": ["refines", "refined", "refining", "refinement", "refinery"],
+        "relax": ["relaxes", "relaxed", "relaxing", "relaxation"],
+        "restrain": ["restrains", "restrained", "restraining", "restraint", "unrestrained"],
+        "revolution": ["revolutions", "revolutionary", "revolutionize", "revolt", "revolve"],
+        "rigid": ["rigidly", "rigidity"],
+        "route": ["routes", "routed", "routing"],
+        "scenario": ["scenarios"],
+        "sphere": ["spheres", "spherical", "hemisphere"],
+        "subordinate": ["subordinates", "subordinated", "subordination"],
+        "supplement": ["supplements", "supplemented", "supplementing", "supplementary"],
+        "suspend": ["suspends", "suspended", "suspending", "suspension"],
+        "team": ["teams", "teamed", "teaming"],
+        "temporary": ["temporarily"],
+        "trigger": ["triggers", "triggered", "triggering"],
+        "unify": ["unifies", "unified", "unifying", "unification"],
+        "violate": ["violates", "violated", "violating", "violation"],
+        "vision": ["visions", "visionary", "envision"],
+
+        # Sublist 10 key derivatives
+        "adjacent": ["adjacently"],
+        "albeit": [],
+        "assemble": ["assembles", "assembled", "assembling", "assembly"],
+        "collapse": ["collapses", "collapsed", "collapsing"],
+        "colleague": ["colleagues", "collegial"],
+        "compile": ["compiles", "compiled", "compiling", "compilation"],
+        "conceive": ["conceives", "conceived", "conceiving", "conceivable", "inconceivable", "concept", "conception"],
+        "convince": ["convinces", "convinced", "convincing", "convincingly", "unconvincing"],
+        "depress": ["depresses", "depressed", "depressing", "depression"],
+        "encounter": ["encounters", "encountered", "encountering"],
+        "enormous": ["enormously", "enormity"],
+        "forthcoming": [],
+        "incline": ["inclines", "inclined", "inclining", "inclination"],
+        "integrity": [],
+        "intrinsic": ["intrinsically"],
+        "invoke": ["invokes", "invoked", "invoking", "invocation"],
+        "levy": ["levies", "levied", "levying"],
+        "likewise": [],
+        "nonetheless": [],
+        "notwithstanding": [],
+        "odd": ["oddly", "oddness"],
+        "ongoing": [],
+        "panel": ["panels", "panelled", "panelling"],
+        "persist": ["persists", "persisted", "persisting", "persistent", "persistently", "persistence"],
+        "pose": ["poses", "posed", "posing"],
+        "reluctance": ["reluctant", "reluctantly"],
+        "so-called": [],
+        "straightforward": ["straightforwardly"],
+        "undergo": ["undergoes", "underwent", "undergone", "undergoing"],
+        "whereby": [],
+    }
+
+    # Apply derivative mapping
+    for headword, derivatives in derivative_map.items():
+        sl = lookup.get(headword.lower())
+        if sl:
+            for d in derivatives:
+                if d.lower() not in lookup:
+                    lookup[d.lower()] = sl
+
+    return lookup
+
+
+def main():
+    # Build the AWL lookup
+    awl_lookup = build_awl_lookup()
+    print(f"AWL lookup built: {len(awl_lookup)} entries (headwords + derivatives)")
+
+    # Load vocab data
+    vocab_file = DATA_DIR / "toefl_vocab.json"
+    with open(vocab_file, "r", encoding="utf-8") as f:
+        words = json.load(f)
+    print(f"Loaded {len(words)} words from {vocab_file}")
+
+    # Annotate each word
+    stats = {"high": 0, "medium": 0, "low": 0}
+    matched_toefl = 0
+    matched_awl = 0
+
+    for w in words:
+        word_lower = w["word"].lower().strip()
+
+        # 1. Check TOEFL exam frequency
+        exam_freq = TOEFL_EXAM_FREQ.get(word_lower, 0)
+
+        # 2. Check AWL
+        awl_sublist = awl_lookup.get(word_lower)
+
+        # 3. Assign frequency_rank
+        if exam_freq > 0:
+            w["frequency_rank"] = exam_freq
+            matched_toefl += 1
+        elif awl_sublist:
+            # AWL sublist 1 (most frequent) -> 91, sublist 10 -> 1
+            w["frequency_rank"] = (10 - awl_sublist) * 10 + 1
+            matched_awl += 1
+        else:
+            w["frequency_rank"] = 0
+
+        # 4. Assign tags and difficulty
+        if exam_freq >= 30 or (awl_sublist and awl_sublist <= 3):
+            w["tags"] = ["高频核心词"]
+            w["difficulty"] = 1
+            stats["high"] += 1
+        elif exam_freq >= 10 or (awl_sublist and awl_sublist <= 7):
+            w["tags"] = ["中频词"]
+            w["difficulty"] = 2
+            stats["medium"] += 1
+        else:
+            w["tags"] = ["低频词"]
+            w["difficulty"] = 3
+            stats["low"] += 1
+
+    # Save
+    with open(vocab_file, "w", encoding="utf-8") as f:
+        json.dump(words, f, ensure_ascii=False, indent=2)
+    print(f"\nSaved {len(words)} words to {vocab_file}")
+
+    # Report
+    print(f"\n========== RESULTS ==========")
+    print(f"Total words: {len(words)}")
+    print(f"Matched TOEFL exam freq: {matched_toefl}")
+    print(f"Matched AWL: {matched_awl}")
+    print(f"No data (low freq): {len(words) - matched_toefl - matched_awl}")
+    print(f"\nTiers:")
+    print(f"  高频核心词: {stats['high']} ({100*stats['high']/len(words):.1f}%)")
+    print(f"  中频词:     {stats['medium']} ({100*stats['medium']/len(words):.1f}%)")
+    print(f"  低频词:     {stats['low']} ({100*stats['low']/len(words):.1f}%)")
+
+    # Show some high-frequency examples
+    print(f"\nSample high-frequency words:")
+    high_words = [w for w in words if "高频核心词" in w.get("tags", [])]
+    for w in high_words[:15]:
+        print(f"  {w['word']} — rank={w['frequency_rank']}, {w['definition_cn'][:40]}")
+
+
+if __name__ == "__main__":
+    main()

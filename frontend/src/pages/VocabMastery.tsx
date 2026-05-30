@@ -10,6 +10,7 @@ import {
   ChevronLeft, Volume2, Eye, Lightbulb, Check, X,
   Trophy, RotateCcw, Brain,
 } from 'lucide-react'
+import { TierBadge } from '@/components/TierBadge'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { motion, AnimatePresence } from 'motion/react'
 
@@ -208,9 +209,12 @@ function InfoScreen({
 
       {/* Word header */}
       <div className="text-center space-y-2">
-        <h2 className="font-display text-3xl font-bold text-slate-100 tracking-tight">
-          {word.syllables || word.word}
-        </h2>
+        <div className="flex items-center justify-center gap-3">
+          <h2 className="font-display text-3xl font-bold text-slate-100 tracking-tight">
+            {word.syllables || word.word}
+          </h2>
+          <TierBadge frequencyRank={word.frequency_rank} tags={word.tags} />
+        </div>
         <div className="flex items-center justify-center gap-3">
           <button onClick={() => onSpeak(word.word, 'uk')}
             className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors">

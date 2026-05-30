@@ -146,6 +146,18 @@ export interface VocabCard {
   example_sentences: VocabExampleSentence[]
   status: string
   repetitions: number
+  frequency_rank?: number
+  tags?: string[]
+}
+
+export type FrequencyTier = 'high' | 'medium' | 'low'
+
+export interface FrequencyTierStats {
+  total: number
+  mastered: number
+  reviewing: number
+  learning: number
+  new: number
 }
 
 export interface VocabStats {
@@ -162,6 +174,7 @@ export interface VocabStats {
     learning: number
     new: number
   }
+  frequency_tiers?: Record<FrequencyTier, FrequencyTierStats>
   streak_days: number
   words_due_today: number
 }
@@ -220,6 +233,8 @@ export interface BookmarkedWord {
   difficulty: number
   status: string
   bookmarked: boolean
+  frequency_rank?: number
+  tags?: string[]
 }
 
 export interface BookmarkList {
@@ -264,6 +279,8 @@ export interface MasteryWord {
   word_root: WordRoot
   mastery_stage: number
   status: string
+  frequency_rank?: number
+  tags?: string[]
   stage1_options: MasteryOption[]
   stage1_correct_key: string
   stage2_options: MasteryOption[]
